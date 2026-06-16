@@ -10,9 +10,9 @@
 
 ## 🎯 Mevcut Aşama
 
-**Aktif Aşama:** Aşama 1 (Çekirdek Mekanik) — oyun mantığı tamamlandı
-**Aktif Agent(ler):** Agent 1 (Oyun Mantığı)
-**Sıradaki iş:** Agent 2 (Tasarım/UI) — Wheel/Ball/HUD component'leri + gerçek PNG asset'ler
+**Aktif Aşama:** Aşama 2a (Görsel Cila + Ana Menü) — UI componentleri tamamlandı
+**Aktif Agent(ler):** —
+**Sıradaki iş:** Agent 1 — GameScreen'i Wheel/Ball/HUD/FeedbackMessage componentlerini kullanacak şekilde refactor et (prop arayüzleri aşağıda)
 
 ---
 
@@ -62,6 +62,31 @@
 - Mevcut kod ve paket dosyalarına dokunulmadı.
 - Sıradaki: Agent 2 — Tasarım/UI.
 
+[2026-06-16] [Agent 2 - Tasarım] — Aşama 2a görsel componentler + ekranlar tamamlandı.
+- Oluşturulan: src/theme/colors.ts (neon arcade paleti)
+- Oluşturulan: src/components/Wheel.tsx (SVG dilimler + Reanimated, rotation SharedValue parent'tan alır)
+- Oluşturulan: src/components/Ball.tsx (bayrak top, glare efekti, ballY SharedValue parent'tan alır)
+- Oluşturulan: src/components/HUD.tsx (puan scale animasyonu, kalp göstergesi, kombo)
+- Oluşturulan: src/components/FeedbackMessage.tsx (fade-in→bekle→fade-out, oyunu durdurmaz)
+- Oluşturulan: src/screens/HomeScreen.tsx (neon arcade menü, SVG stadyum arka planı)
+- Oluşturulan: src/screens/GameOverScreen.tsx (sıralı giriş animasyonları, skor kartı)
+- Güncellenen: src/data/strings.ts (menü metinleri eklendi — ortak dosya, not bırakıldı)
+- Güncellenen: App.tsx (home → game → gameover navigasyonu — ortak dosya, not bırakıldı)
+- tsc --noEmit: 0 hata ✅
+- Sıradaki: Agent 1 — GameScreen'i aşağıdaki prop arayüzlerine göre refactor etsin
+
+### Agent 1 İçin Prop Arayüzleri (GameScreen refactor):
+```
+<Wheel countries={wheelCountries} rotation={wheelRotation} radius={WHEEL_RADIUS}
+       style={styles.wheelContainer} />
+<Ball  country={ballCountry} ballY={ballY} restY={BALL_Y_REST}
+       style={styles.ball} />
+<HUD   score={gameState.score} lives={gameState.lives} combo={gameState.combo} />
+<FeedbackMessage result={feedback} />   // feedback: { type, countryName }
+```
+- Wheel/Ball SharedValue'larını GameScreen yönetmeye devam eder (rotation, ballY).
+- FeedbackMessage her zaman render'lanmalı (mount'lu kalmalı, opacity ile gizlenir).
+
 [2026-06-16] [Agent 1 - Oyun] — Aşama 1 oyun mantığı tamamlandı.
 - Oluşturulan: src/data/strings.ts, src/data/countries.ts (Grup A, 8 ülke)
 - Oluşturulan: src/utils/gameLogic.ts (getHitSegment, isMatch, nextBallTarget, updateScore — saf fonksiyonlar)
@@ -85,7 +110,7 @@
 
 - [x] Aşama 0 — Kurulum + asset (Expo + Reanimated 4 + SVG kurulu; asset'ler boş)
 - [x] Aşama 1 — Çekirdek mekanik (oyun mantığı Agent 1 tarafından tamamlandı)
-- [ ] Aşama 2a — Görsel + menü
+- [x] Aşama 2a — Görsel + menü (UI componentleri Agent 2 tarafından tamamlandı; GameScreen refactor bekliyor)
 - [ ] Aşama 2b — Juice + ses
 - [ ] Aşama 2c — Level + combo
 - [ ] Aşama 3 — Leaderboard + kullanıcı
