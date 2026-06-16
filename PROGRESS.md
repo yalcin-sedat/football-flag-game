@@ -10,9 +10,9 @@
 
 ## 🎯 Mevcut Aşama
 
-**Aktif Aşama:** Aşama 2b — Juice + ses efektleri
+**Aktif Aşama:** Aşama 2c — Level sistemi + combo
 **Aktif Agent(ler):** —
-**Sıradaki iş:** Agent 2 — doğru glow/parıltı, yanlış ekran titremesi, ses efektleri (tap, fırlatma, doğru, yanlış, game over)
+**Sıradaki iş:** Agent 1 — data/levels.ts (level tanımları), level geçiş animasyonu; Agent 2 — combo HUD efektleri, yıldız sistemi, yüksek skor (AsyncStorage)
 
 ---
 
@@ -49,6 +49,15 @@
 <!-- ÖRNEK (silinebilir):
 [2026-01-15] [Agent 1 - Oyun] — gameLogic.ts'de getHitSegment ve isMatch yazıldı, test edildi çalışıyor. Sıradaki: GameScreen'e bağlama. Not: rotation değeri JS'e useEffect+interval ile okunuyor.
 -->
+
+[2026-06-17] [Agent 2 - Tasarım] — Aşama 2b juice efektleri tamamlandı.
+- Oluşturulan: src/utils/sounds.ts (expo-av tabanlı ses yöneticisi; 5 ses kanalı, lazy önbellek, hata yakamalı)
+- Oluşturulan: src/components/ScreenFlash.tsx (doğruda yeşil / yanlışta kırmızı tam ekran flaş, fade-out animasyonu)
+- Oluşturulan: assets/sounds/{tap,launch,correct,wrong,gameover}.mp3 (Metro placeholder — gerçek seslerle değiştirilecek)
+- Güncellenen: src/screens/GameScreen.tsx — shakeX animasyonu, ScreenFlash entegrasyonu, Haptics, sounds çağrıları eklendi
+- Paket eklendi: expo-av ^16.0.8, expo-haptics ~56.0.3
+- tsc --noEmit: 0 hata ✅
+- NOT: assets/sounds/ içindeki .mp3 dosyaları şimdilik sessiz placeholder; gerçek CC0 sesler SETUP.md talimatıyla değiştirilecek
 
 [2026-06-16] [Agent 1 - Oyun] — GameScreen refactor: inline SVG/View'lar Wheel/Ball/HUD/FeedbackMessage componentlerine taşındı.
 - GameScreen.tsx → tüm görsel kod kaldırıldı; Wheel/Ball/HUD/FeedbackMessage import edildi
@@ -118,7 +127,8 @@
 
 - [x] Aşama 0 — Kurulum + asset (Expo + Reanimated 4 + SVG kurulu; asset'ler boş)
 - [x] Aşama 1 — Çekirdek mekanik (oyun mantığı Agent 1 tarafından tamamlandı)
-- [x] Aşama 2a — Görsel + menü (UI componentleri Agent 2 tarafından tamamlandı; GameScreen refactor bekliyor)
+- [x] Aşama 2a — Görsel + menü (UI componentleri + GameScreen entegrasyonu tamamlandı)
+- [x] Aşama 2b — Juice + ses (ekran flaşı, titreme, haptic, ses altyapısı tamamlandı)
 - [ ] Aşama 2b — Juice + ses
 - [ ] Aşama 2c — Level + combo
 - [ ] Aşama 3 — Leaderboard + kullanıcı

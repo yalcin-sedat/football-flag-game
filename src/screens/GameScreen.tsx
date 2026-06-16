@@ -1,5 +1,6 @@
 // Çekirdek oyun ekranı — tüm oyun mantığı burada; görsel componentler ayrı
 // [2026-06-16] Refactor: inline SVG/View'lar → Wheel/Ball/HUD/FeedbackMessage componentlerine taşındı
+// [2026-06-16] Aşama 2b: ekran titremesi, renk flaşı, haptic + ses altyapısı eklendi
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
@@ -8,13 +9,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {
+import Animated, {
   cancelAnimation,
+  useAnimatedStyle,
   useSharedValue,
   withRepeat,
+  withSequence,
   withTiming,
   Easing,
 } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import {
   getHitSegment,
   isMatch,
@@ -23,10 +27,12 @@ import {
   GameState,
 } from '../utils/gameLogic';
 import { Country, LEVEL_1_COUNTRIES } from '../data/countries';
+import { sounds } from '../utils/sounds';
 import Wheel from '../components/Wheel';
 import Ball from '../components/Ball';
 import HUD from '../components/HUD';
 import FeedbackMessage, { FeedbackResult } from '../components/FeedbackMessage';
+import ScreenFlash, { FlashType } from '../components/ScreenFlash';
 
 const { width, height } = Dimensions.get('window');
 
@@ -57,8 +63,9 @@ export default function GameScreen({ onGameOver }: Props) {
     lives: 3,
     combo: 0,
   });
-  const [ballCountry, setBallCountry] = useState<Country>(wheelCountries[0]);
-  const [feedback, setFeedback]       = useState<FeedbackResult>({ type: null });
+  const [ballCountry, setBallCountry]   = useState<Country>(wheelCountries[0]);
+  const [feedback, setFeedback]         = useState<FeedbackResult>({ type: null });
+  const [flash, setFlash]               = useState<FlashType>(null);
   const [ballLaunched, setBallLaunched] = useState(false);
   const [gameOver, setGameOver]         = useState(false);
 
@@ -71,6 +78,9 @@ export default function GameScreen({ onGameOver }: Props) {
 
   // Top Y pozisyonu — Ball componenti doğrudan kullanır (translateY = ballY - restY)
   const ballY = useSharedValue(BALL_Y_REST);
+
+  // Ekran titremesi — yanlış vuruşta X ekseninde sallama
+  const shakeX = useSharedValue(0);
 
   // --- Çark dönüşünü başlat ---
   useEffect(() => {
@@ -94,10 +104,39 @@ export default function GameScreen({ onGameOver }: Props) {
     return () => clearInterval(interval);
   }, []);
 
-  // --- Geri bildirim mesajını göster ve sıfırla ---
+  // Animasyon stili — ekran titremesi
+  const shakeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shakeX.value }],
+  }));
+
+  // --- Yanlış vuruş titremesi ---
+  function triggerShake() {
+    shakeX.value = withSequence(
+      withTiming(-9, { duration: 55 }),
+      withTiming( 8, { duration: 55 }),
+      withTiming(-5, { duration: 50 }),
+      withTiming( 5, { duration: 50 }),
+      withTiming(-2, { duration: 45 }),
+      withTiming( 0, { duration: 45 }),
+    );
+  }
+
+  // --- Geri bildirim + efektler ---
   const showFeedback = useCallback((type: 'correct' | 'wrong', countryName?: string) => {
     setFeedback({ type, countryName });
+    setFlash(type);
+
+    if (type === 'correct') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      sounds.correct();
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      sounds.wrong();
+      triggerShake();
+    }
+
     setTimeout(() => setFeedback({ type: null }), 1200);
+    setTimeout(() => setFlash(null), 500);
   }, []);
 
   // --- Tap: topu fırlat ---
@@ -106,6 +145,8 @@ export default function GameScreen({ onGameOver }: Props) {
     if (ballLaunched || gameOver) return;
 
     setBallLaunched(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    sounds.launch();
 
     // Topu yukarı fırlat
     ballY.value = withTiming(BALL_Y_HIT, {
@@ -128,7 +169,7 @@ export default function GameScreen({ onGameOver }: Props) {
       const newState = updateScore(gameState, matched);
       setGameState(newState);
 
-      // Geri bildirim göster (oyun durmaz)
+      // Geri bildirim + efektler
       showFeedback(matched ? 'correct' : 'wrong', hitCountry.name);
 
       // Topu geri döndür
@@ -142,6 +183,8 @@ export default function GameScreen({ onGameOver }: Props) {
         if (newState.lives <= 0) {
           setGameOver(true);
           cancelAnimation(wheelRotation);
+          sounds.gameover();
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           onGameOver(newState.score);
           return;
         }
@@ -155,44 +198,60 @@ export default function GameScreen({ onGameOver }: Props) {
   }, [ballLaunched, gameOver, gameState, ballCountry, wheelCountries]);
 
   return (
-    <TouchableOpacity
-      style={styles.container}
-      activeOpacity={1}
-      onPress={handleTap}
-    >
-      {/* HUD: Puan, Can, Seviye, Kombo */}
-      <HUD score={gameState.score} lives={gameState.lives} combo={gameState.combo} />
+    // Dış kapsayıcı: overflow:hidden shake sırasında taşmayı önler
+    <View style={styles.root}>
+      {/* Shake animasyonu tüm oyun alanına uygulanır */}
+      <Animated.View style={[styles.shakeWrapper, shakeStyle]}>
+        <TouchableOpacity
+          style={styles.container}
+          activeOpacity={1}
+          onPress={handleTap}
+        >
+          {/* HUD: Puan, Can, Seviye, Kombo */}
+          <HUD score={gameState.score} lives={gameState.lives} combo={gameState.combo} />
 
-      {/* Dönen çark — rotation SharedValue Wheel'e geçirilir */}
-      <Wheel
-        countries={wheelCountries}
-        rotation={wheelRotation}
-        radius={WHEEL_RADIUS}
-        style={styles.wheelContainer}
-      />
+          {/* Dönen çark — rotation SharedValue Wheel'e geçirilir */}
+          <Wheel
+            countries={wheelCountries}
+            rotation={wheelRotation}
+            radius={WHEEL_RADIUS}
+            style={styles.wheelContainer}
+          />
 
-      {/* Bayrak desenli top — ballY SharedValue Ball'a geçirilir */}
-      <Ball
-        country={ballCountry}
-        ballY={ballY}
-        restY={BALL_Y_REST}
-        style={styles.ball}
-      />
+          {/* Bayrak desenli top — ballY SharedValue Ball'a geçirilir */}
+          <Ball
+            country={ballCountry}
+            ballY={ballY}
+            restY={BALL_Y_REST}
+            style={styles.ball}
+          />
 
-      {/* Geri bildirim mesajı — her zaman mount'lı, opacity ile gizlenir */}
-      <View style={styles.feedbackWrapper} pointerEvents="none">
-        <FeedbackMessage result={feedback} />
-      </View>
+          {/* Geri bildirim mesajı — her zaman mount'lı, opacity ile gizlenir */}
+          <View style={styles.feedbackWrapper} pointerEvents="none">
+            <FeedbackMessage result={feedback} />
+          </View>
 
-      {/* Dokunma ipucu */}
-      {!ballLaunched && !gameOver && (
-        <Text style={styles.hint}>Ekrana dokun — fırlat!</Text>
-      )}
-    </TouchableOpacity>
+          {/* Dokunma ipucu */}
+          {!ballLaunched && !gameOver && (
+            <Text style={styles.hint}>Ekrana dokun — fırlat!</Text>
+          )}
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Tam ekran renk flaşı — shake dışında, en üstte */}
+      <ScreenFlash flashType={flash} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    overflow: 'hidden', // shake sırasında içeriğin taşmasını engeller
+  },
+  shakeWrapper: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#0d0d1a',
