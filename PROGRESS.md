@@ -50,6 +50,12 @@
 [2026-01-15] [Agent 1 - Oyun] — gameLogic.ts'de getHitSegment ve isMatch yazıldı, test edildi çalışıyor. Sıradaki: GameScreen'e bağlama. Not: rotation değeri JS'e useEffect+interval ile okunuyor.
 -->
 
+[2026-06-16] [Codex] — Proje dosyalama iskeleti standartlaştırıldı.
+- Eklendi: `README.md` (doğru proje kökü, komutlar, klasör yapısı).
+- Eklendi: `src/components/`, `src/theme/`, `assets/flags/`, `assets/maps/`, `assets/sounds/` için `.gitkeep`.
+- Kod davranışına dokunulmadı.
+- Kullanıcı onayıyla üst klasördeki kopya dokümanlar `_archive/root-doc-copies/` içine taşındı.
+
 [2026-06-16] [Codex] — Proje hafızası `flag-striker` deposuna bağlandı.
 - `AGENTS.md` ve `CLAUDE.md` uygulama deposunda güncellendi; Codex/Claude oturumları artık aynı rol ve proje kurallarını okuyabilir.
 - `PROGRESS.md`, `PRD.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `SETUP.md` uygulama deposuna eklendi.
