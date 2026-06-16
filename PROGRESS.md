@@ -10,9 +10,9 @@
 
 ## 🎯 Mevcut Aşama
 
-**Aktif Aşama:** Aşama 2a (Görsel Cila + Ana Menü) — UI componentleri tamamlandı
+**Aktif Aşama:** Aşama 2b — Juice + ses efektleri
 **Aktif Agent(ler):** —
-**Sıradaki iş:** Agent 1 — GameScreen'i Wheel/Ball/HUD/FeedbackMessage componentlerini kullanacak şekilde refactor et (prop arayüzleri aşağıda)
+**Sıradaki iş:** Agent 2 — doğru glow/parıltı, yanlış ekran titremesi, ses efektleri (tap, fırlatma, doğru, yanlış, game over)
 
 ---
 
@@ -49,6 +49,14 @@
 <!-- ÖRNEK (silinebilir):
 [2026-01-15] [Agent 1 - Oyun] — gameLogic.ts'de getHitSegment ve isMatch yazıldı, test edildi çalışıyor. Sıradaki: GameScreen'e bağlama. Not: rotation değeri JS'e useEffect+interval ile okunuyor.
 -->
+
+[2026-06-16] [Agent 1 - Oyun] — GameScreen refactor: inline SVG/View'lar Wheel/Ball/HUD/FeedbackMessage componentlerine taşındı.
+- GameScreen.tsx → tüm görsel kod kaldırıldı; Wheel/Ball/HUD/FeedbackMessage import edildi
+- FeedbackResult tipi benimsendi (countryName alanı)
+- wheelRotation + ballY SharedValue'ları GameScreen'de kalmaya devam ediyor (mantık aynı)
+- tsconfig.json → "jsx": "react-native" eklendi (VS Code IDE false-positive düzeltmesi)
+- tsc --noEmit: 0 hata ✅
+- Sıradaki: Agent 2 — Aşama 2b juice efektleri
 
 [2026-06-16] [Codex] — Proje dosyalama iskeleti standartlaştırıldı.
 - Eklendi: `README.md` (doğru proje kökü, komutlar, klasör yapısı).
