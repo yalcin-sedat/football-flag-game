@@ -1,6 +1,8 @@
-// Oyun Bitti ekranı — final skor, doğruluk oranı, butonlar
-import React, { useEffect } from 'react';
+// Oyun Bitti ekranı — final skor, yeni rekor rozeti, butonlar
+// [2026-06-17] Aşama 2c: isNewRecord prop + AsyncStorage yüksek skor gösterimi
+import React, { useEffect, useState } from 'react';
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { getHighScore } from '../utils/storage';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -16,11 +18,17 @@ const { width } = Dimensions.get('window');
 
 type GameOverScreenProps = {
   finalScore: number;
+  isNewRecord?: boolean;
   onRestart: () => void;
   onHome: () => void;
 };
 
-export default function GameOverScreen({ finalScore, onRestart, onHome }: GameOverScreenProps) {
+export default function GameOverScreen({ finalScore, isNewRecord = false, onRestart, onHome }: GameOverScreenProps) {
+  const [highScore, setHighScore] = useState(0);
+
+  useEffect(() => {
+    getHighScore().then(setHighScore);
+  }, []);
   // Giriş animasyonları — sıralı fade-in
   const titleOpacity  = useSharedValue(0);
   const titleY        = useSharedValue(-24);
@@ -69,8 +77,16 @@ export default function GameOverScreen({ finalScore, onRestart, onHome }: GameOv
 
       {/* Skor kartı */}
       <Animated.View style={[styles.scoreCard, scoreStyle]}>
+        {isNewRecord && (
+          <View style={styles.newRecordBadge}>
+            <Text style={styles.newRecordText}>🏆 YENİ REKOR!</Text>
+          </View>
+        )}
         <Text style={styles.scoreLabel}>{strings.finalSkor}</Text>
         <Text style={styles.scoreValue}>{finalScore}</Text>
+        {!isNewRecord && highScore > 0 && (
+          <Text style={styles.highScoreText}>En yüksek: {highScore}</Text>
+        )}
       </Animated.View>
 
       {/* Butonlar */}
@@ -130,6 +146,28 @@ const styles = StyleSheet.create({
     color: colors.neonGold,
     fontSize: 56,
     fontWeight: '900',
+  },
+  newRecordBadge: {
+    backgroundColor: 'rgba(255,215,0,0.15)',
+    borderWidth: 1,
+    borderColor: colors.neonGold,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    marginBottom: 10,
+  },
+  newRecordText: {
+    color: colors.neonGold,
+    fontSize: 13,
+    fontWeight: 'bold',
+    letterSpacing: 1.5,
+  },
+  highScoreText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+    letterSpacing: 0.5,
   },
   buttons: {
     width: width * 0.72,

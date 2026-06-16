@@ -1,6 +1,7 @@
 // Çekirdek oyun ekranı — tüm oyun mantığı burada; görsel componentler ayrı
-// [2026-06-16] Refactor: inline SVG/View'lar → Wheel/Ball/HUD/FeedbackMessage componentlerine taşındı
-// [2026-06-16] Aşama 2b: ekran titremesi, renk flaşı, haptic + ses altyapısı eklendi
+// [2026-06-16] Refactor: inline SVG/View'lar → Wheel/Ball/HUD/FeedbackMessage
+// [2026-06-16] Aşama 2b: ekran titremesi, renk flaşı, haptic + ses
+// [2026-06-17] Aşama 2c: dinamik level sistemi, level geçiş animasyonu, yüksek skor
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
@@ -26,85 +27,88 @@ import {
   updateScore,
   GameState,
 } from '../utils/gameLogic';
-import { Country, LEVEL_1_COUNTRIES } from '../data/countries';
 import { sounds } from '../utils/sounds';
+import { saveHighScoreIfBetter } from '../utils/storage';
+import { LEVELS, LevelConfig } from '../data/levels';
 import Wheel from '../components/Wheel';
 import Ball from '../components/Ball';
 import HUD from '../components/HUD';
 import FeedbackMessage, { FeedbackResult } from '../components/FeedbackMessage';
 import ScreenFlash, { FlashType } from '../components/ScreenFlash';
+import LevelUpBanner from '../components/LevelUpBanner';
 
 const { width, height } = Dimensions.get('window');
 
-// Çark sabitleri
+// Çark sabitleri (konum değişmez; boyut/içerik level'a göre değişir)
 const WHEEL_RADIUS = 130;
 const WHEEL_CX = width / 2;
 const WHEEL_CY = height * 0.38;
-const SEGMENT_COUNT = 4;
 
 // Top sabitleri
-const BALL_Y_REST = height * 0.78;   // topun dinlenme Y konumu (merkezi)
-const BALL_Y_HIT  = WHEEL_CY + WHEEL_RADIUS + 30; // çarpışma Y eşiği
-const LAUNCH_DURATION = 350;          // ms — topun çarka ulaşma süresi
-
-// Çark bir tam tur için kaç ms (yavaş = 4000ms)
-const WHEEL_ROTATION_DURATION = 4000;
+const BALL_Y_REST    = height * 0.78;
+const BALL_Y_HIT     = WHEEL_CY + WHEEL_RADIUS + 30;
+const LAUNCH_DURATION = 350;
 
 type Props = {
-  onGameOver: (finalScore: number) => void;
+  onGameOver: (finalScore: number, isNewRecord: boolean) => void;
 };
 
 export default function GameScreen({ onGameOver }: Props) {
-  const wheelCountries = LEVEL_1_COUNTRIES;
+  // --- Level state ---
+  const [levelIdx, setLevelIdx]           = useState(0);
+  const [isLevelingUp, setIsLevelingUp]   = useState(false);
+  const levelRef = useRef<LevelConfig>(LEVELS[0]);
 
-  // --- State ---
-  const [gameState, setGameState] = useState<GameState>({
-    score: 0,
-    lives: 3,
-    combo: 0,
-  });
-  const [ballCountry, setBallCountry]   = useState<Country>(wheelCountries[0]);
-  const [feedback, setFeedback]         = useState<FeedbackResult>({ type: null });
-  const [flash, setFlash]               = useState<FlashType>(null);
-  const [ballLaunched, setBallLaunched] = useState(false);
-  const [gameOver, setGameOver]         = useState(false);
+  const level         = LEVELS[levelIdx];
+  const wheelCountries = level.countries;
+  const segmentCount   = level.countries.length;
 
-  // --- Çark dönüş açısı (Reanimated shared value) ---
-  // Değer 0→360 aralığında sürekli artar; Wheel componenti doğrudan kullanır
+  // --- Oyun state ---
+  const [gameState, setGameState]         = useState<GameState>({ score: 0, lives: 3, combo: 0 });
+  const [ballCountry, setBallCountry]     = useState(wheelCountries[0]);
+  const [feedback, setFeedback]           = useState<FeedbackResult>({ type: null });
+  const [flash, setFlash]                 = useState<FlashType>(null);
+  const [ballLaunched, setBallLaunched]   = useState(false);
+  const [gameOver, setGameOver]           = useState(false);
+
+  // --- Animasyon shared value'ları ---
   const wheelRotation = useSharedValue(0);
+  const rotationRef   = useRef(0);
+  const ballY         = useSharedValue(BALL_Y_REST);
+  const shakeX        = useSharedValue(0);
 
-  // JS tarafında anlık rotation'ı okumak için ref (worklet olmayan ortam)
-  const rotationRef = useRef(0);
-
-  // Top Y pozisyonu — Ball componenti doğrudan kullanır (translateY = ballY - restY)
-  const ballY = useSharedValue(BALL_Y_REST);
-
-  // Ekran titremesi — yanlış vuruşta X ekseninde sallama
-  const shakeX = useSharedValue(0);
-
-  // --- Çark dönüşünü başlat ---
+  // --- Çark dönüşünü level hızına göre başlat / yeniden başlat ---
   useEffect(() => {
-    // Sonsuz döngü: 0→360, sonra tekrar başlar
+    levelRef.current = LEVELS[levelIdx];
+    cancelAnimation(wheelRotation);
+    wheelRotation.value = 0; // sıfırla — hız değişince tutarlı başlangıç
+
     wheelRotation.value = withRepeat(
       withTiming(360, {
-        duration: WHEEL_ROTATION_DURATION,
+        duration: levelRef.current.rotationDuration,
         easing: Easing.linear,
       }),
       -1,
       false,
     );
+
     return () => cancelAnimation(wheelRotation);
-  }, []);
+  }, [levelIdx]);
 
   // Rotation değerini JS'e kopyala (çarpışma hesabı için)
   useEffect(() => {
     const interval = setInterval(() => {
       rotationRef.current = wheelRotation.value % 360;
-    }, 16); // ~60fps
+    }, 16);
     return () => clearInterval(interval);
   }, []);
 
-  // Animasyon stili — ekran titremesi
+  // Level değişince top ülkesini sıfırla
+  useEffect(() => {
+    setBallCountry(LEVELS[levelIdx].countries[0]);
+  }, [levelIdx]);
+
+  // --- Animasyon stilleri ---
   const shakeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shakeX.value }],
   }));
@@ -139,10 +143,23 @@ export default function GameScreen({ onGameOver }: Props) {
     setTimeout(() => setFlash(null), 500);
   }, []);
 
+  // --- Level atlama ---
+  function handleLevelUp(nextIdx: number) {
+    setIsLevelingUp(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    sounds.correct(); // kısa sevinç sesi
+    // LevelUpBanner.onDone() çağrıldığında oyun devam eder (aşağıda)
+    setLevelIdx(nextIdx);
+  }
+
+  function handleLevelUpDone() {
+    setIsLevelingUp(false);
+    setBallLaunched(false);
+  }
+
   // --- Tap: topu fırlat ---
-  // Çarpışma hesabı: top BALL_Y_HIT'e ulaşınca rotation okunur
   const handleTap = useCallback(() => {
-    if (ballLaunched || gameOver) return;
+    if (ballLaunched || gameOver || isLevelingUp) return;
 
     setBallLaunched(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -157,19 +174,12 @@ export default function GameScreen({ onGameOver }: Props) {
     // Çarpışma anında rotation'ı oku
     setTimeout(() => {
       const currentRotation = rotationRef.current;
-
-      // Vurulan dilim index'i hesapla
-      const hitIndex   = getHitSegment(currentRotation, SEGMENT_COUNT);
+      const hitIndex   = getHitSegment(currentRotation, segmentCount);
       const hitCountry = wheelCountries[hitIndex];
-
-      // Eşleştirme kontrolü
-      const matched = isMatch(hitCountry.code, ballCountry.code);
-
-      // Skor/can güncelleme
-      const newState = updateScore(gameState, matched);
+      const matched    = isMatch(hitCountry.code, ballCountry.code);
+      const newState   = updateScore(gameState, matched);
       setGameState(newState);
 
-      // Geri bildirim + efektler
       showFeedback(matched ? 'correct' : 'wrong', hitCountry.name);
 
       // Topu geri döndür
@@ -185,20 +195,34 @@ export default function GameScreen({ onGameOver }: Props) {
           cancelAnimation(wheelRotation);
           sounds.gameover();
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          onGameOver(newState.score);
+          // Yüksek skoru kaydet; sonuçla birlikte üst component'e bildir
+          saveHighScoreIfBetter(newState.score).then((isNew) => {
+            onGameOver(newState.score, isNew);
+          });
           return;
         }
 
-        // Yeni hedef bayrak üret
+        // Level atlama kontrolü
+        const currentLevel = levelRef.current;
+        const nextIdx = levelIdx + 1;
+        if (
+          currentLevel.scoreToAdvance !== null &&
+          newState.score >= currentLevel.scoreToAdvance &&
+          nextIdx < LEVELS.length
+        ) {
+          handleLevelUp(nextIdx);
+          return;
+        }
+
+        // Devam — yeni hedef bayrak üret
         const next = nextBallTarget(wheelCountries, ballCountry.code);
         setBallCountry(next);
         setBallLaunched(false);
       }, 350);
     }, LAUNCH_DURATION);
-  }, [ballLaunched, gameOver, gameState, ballCountry, wheelCountries]);
+  }, [ballLaunched, gameOver, isLevelingUp, gameState, ballCountry, wheelCountries, segmentCount, levelIdx]);
 
   return (
-    // Dış kapsayıcı: overflow:hidden shake sırasında taşmayı önler
     <View style={styles.root}>
       {/* Shake animasyonu tüm oyun alanına uygulanır */}
       <Animated.View style={[styles.shakeWrapper, shakeStyle]}>
@@ -208,7 +232,12 @@ export default function GameScreen({ onGameOver }: Props) {
           onPress={handleTap}
         >
           {/* HUD: Puan, Can, Seviye, Kombo */}
-          <HUD score={gameState.score} lives={gameState.lives} combo={gameState.combo} />
+          <HUD
+            score={gameState.score}
+            lives={gameState.lives}
+            combo={gameState.combo}
+            level={level.id}
+          />
 
           {/* Dönen çark — rotation SharedValue Wheel'e geçirilir */}
           <Wheel
@@ -226,19 +255,26 @@ export default function GameScreen({ onGameOver }: Props) {
             style={styles.ball}
           />
 
-          {/* Geri bildirim mesajı — her zaman mount'lı, opacity ile gizlenir */}
+          {/* Geri bildirim mesajı — her zaman mount'lı */}
           <View style={styles.feedbackWrapper} pointerEvents="none">
             <FeedbackMessage result={feedback} />
           </View>
 
           {/* Dokunma ipucu */}
-          {!ballLaunched && !gameOver && (
+          {!ballLaunched && !gameOver && !isLevelingUp && (
             <Text style={styles.hint}>Ekrana dokun — fırlat!</Text>
           )}
         </TouchableOpacity>
       </Animated.View>
 
-      {/* Tam ekran renk flaşı — shake dışında, en üstte */}
+      {/* Level atlama banner'ı — shake'in dışında, ortada */}
+      <LevelUpBanner
+        level={level.id}
+        visible={isLevelingUp}
+        onDone={handleLevelUpDone}
+      />
+
+      {/* Tam ekran renk flaşı */}
       <ScreenFlash flashType={flash} />
     </View>
   );
@@ -247,7 +283,7 @@ export default function GameScreen({ onGameOver }: Props) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    overflow: 'hidden', // shake sırasında içeriğin taşmasını engeller
+    overflow: 'hidden',
   },
   shakeWrapper: {
     flex: 1,
@@ -257,19 +293,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#0d0d1a',
     alignItems: 'center',
   },
-  // Çark konumlandırması — Wheel componenti kendi boyutunu bilir
   wheelContainer: {
     position: 'absolute',
     top: WHEEL_CY - WHEEL_RADIUS,
     left: WHEEL_CX - WHEEL_RADIUS,
   },
-  // Top konumlandırması — Ball componenti varsayılan boyutu 72; yarısı = 36
   ball: {
     position: 'absolute',
     top: BALL_Y_REST - 36,
     left: width / 2 - 36,
   },
-  // Geri bildirim sarmalayıcı — FeedbackMessage içi zaten pointerEvents="none"
   feedbackWrapper: {
     position: 'absolute',
     top: height * 0.62,

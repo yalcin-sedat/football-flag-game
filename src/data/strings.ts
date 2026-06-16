@@ -17,6 +17,12 @@ export const strings = {
   anaMenue:     'Ana Menü',
   finalSkor:    'Final Skor',
 
+  // Level
+  levelAtladi:  (n: number) => `SEVİYE ${n}`,
+  carkHizlandi: 'Çark hızlandı!',
+  yeniRekor:    'YENİ REKOR!',
+  enYuksek:     (n: number) => `En yüksek: ${n}`,
+
   // Ana menü
   oyna:         'OYNA',
   gunlukGorev:  'Günlük Görev',

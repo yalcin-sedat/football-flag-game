@@ -10,9 +10,9 @@
 
 ## 🎯 Mevcut Aşama
 
-**Aktif Aşama:** Aşama 2c — Level sistemi + combo
+**Aktif Aşama:** Aşama 3 — Leaderboard + kullanıcı (Supabase)
 **Aktif Agent(ler):** —
-**Sıradaki iş:** Agent 1 — data/levels.ts (level tanımları), level geçiş animasyonu; Agent 2 — combo HUD efektleri, yıldız sistemi, yüksek skor (AsyncStorage)
+**Sıradaki iş:** Agent 3 — Supabase kurulumu, global sıralama tablosu, kullanıcı adı kayıt akışı
 
 ---
 
@@ -49,6 +49,17 @@
 <!-- ÖRNEK (silinebilir):
 [2026-01-15] [Agent 1 - Oyun] — gameLogic.ts'de getHitSegment ve isMatch yazıldı, test edildi çalışıyor. Sıradaki: GameScreen'e bağlama. Not: rotation değeri JS'e useEffect+interval ile okunuyor.
 -->
+
+[2026-06-17] [Agent 1+2 - Oyun+Tasarım] — Aşama 2c level sistemi + yüksek skor tamamlandı.
+- Oluşturulan: src/data/levels.ts (3 level: 4/6/8 dilim, 4000/3200/2600ms, eşik 10/25/∞ puan)
+- Oluşturulan: src/utils/storage.ts (AsyncStorage yüksek skor; saveHighScoreIfBetter → boolean)
+- Oluşturulan: src/components/LevelUpBanner.tsx (altın renkli banner, 1400ms animasyon, onDone callback)
+- Güncellenen: src/screens/GameScreen.tsx — dinamik levelIdx, level geçiş mantığı, yüksek skor kaydı
+- Güncellenen: src/screens/GameOverScreen.tsx — isNewRecord prop, yüksek skor gösterimi, "YENİ REKOR!" rozeti
+- Güncellenen: App.tsx — isNewRecord state, handleGameOver imzası güncellendi
+- Güncellenen: src/data/strings.ts — levelAtladi, carkHizlandi, yeniRekor, enYuksek eklendi
+- tsc --noEmit: 0 hata ✅
+- Sıradaki: Agent 3 — Supabase + global leaderboard (Aşama 3)
 
 [2026-06-17] [Agent 2 - Tasarım] — Aşama 2b juice efektleri tamamlandı.
 - Oluşturulan: src/utils/sounds.ts (expo-av tabanlı ses yöneticisi; 5 ses kanalı, lazy önbellek, hata yakamalı)
@@ -129,6 +140,7 @@
 - [x] Aşama 1 — Çekirdek mekanik (oyun mantığı Agent 1 tarafından tamamlandı)
 - [x] Aşama 2a — Görsel + menü (UI componentleri + GameScreen entegrasyonu tamamlandı)
 - [x] Aşama 2b — Juice + ses (ekran flaşı, titreme, haptic, ses altyapısı tamamlandı)
+- [x] Aşama 2c — Level + combo (3 level, dinamik hız, yüksek skor AsyncStorage tamamlandı)
 - [ ] Aşama 2b — Juice + ses
 - [ ] Aşama 2c — Level + combo
 - [ ] Aşama 3 — Leaderboard + kullanıcı
