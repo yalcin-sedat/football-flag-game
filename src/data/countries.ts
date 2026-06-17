@@ -16,5 +16,18 @@ export const GROUP_A_COUNTRIES: Country[] = [
   { code: 'it', name: 'İtalya',    color: '#009246' },
 ];
 
+// Grup B: orta zorluk — daha az tanınan ülkeler
+export const GROUP_B_COUNTRIES: Country[] = [
+  { code: 'ar', name: 'Arjantin',  color: '#74ACDF' },
+  { code: 'es', name: 'İspanya',   color: '#AA151B' },
+  { code: 'pt', name: 'Portekiz',  color: '#006600' },
+  { code: 'nl', name: 'Hollanda',  color: '#AE1C28' },
+  { code: 'pl', name: 'Polonya',   color: '#DC143C' },
+  { code: 'kr', name: 'G. Kore',   color: '#003478' },
+];
+
+// Tüm ülkeler (Grup A + B) — ilerleyen levellar için
+export const ALL_COUNTRIES: Country[] = [...GROUP_A_COUNTRIES, ...GROUP_B_COUNTRIES];
+
 // Aşama 1'de 4 dilimli çark için ilk 4 ülke
 export const LEVEL_1_COUNTRIES = GROUP_A_COUNTRIES.slice(0, 4);

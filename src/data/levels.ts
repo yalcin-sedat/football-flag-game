@@ -1,11 +1,12 @@
 // Level tanımları — her level ülke kümesi, çark hızı ve geçiş eşiğini belirler
-import { Country, GROUP_A_COUNTRIES } from './countries';
+import { Country, GROUP_A_COUNTRIES, GROUP_B_COUNTRIES } from './countries';
 
 export type LevelConfig = {
   id: number;
   countries: Country[];
-  rotationDuration: number; // ms — tam bir dönüş süresi (küçüldükçe hızlanır)
-  scoreToAdvance: number | null; // null = son level
+  rotationDuration: number;   // ms — tam bir dönüş süresi (küçüldükçe hızlanır)
+  scoreToAdvance: number | null; // null = son level, geçiş yoktur
+  timeLimitSeconds?: number;  // sadece Challenge modu; tanımlıysa sayaç gösterilir
 };
 
 export const LEVELS: LevelConfig[] = [
@@ -25,6 +26,13 @@ export const LEVELS: LevelConfig[] = [
     id: 3,
     countries: GROUP_A_COUNTRIES,             // 8 dilim — tüm Grup A
     rotationDuration: 2600,
+    scoreToAdvance: 45,
+  },
+  {
+    id: 4,                                    // Challenge: Grup B ülkeleri, hızlı, 60sn limit
+    countries: GROUP_B_COUNTRIES,             // 6 dilim — yabancı ülkeler
+    rotationDuration: 2000,
     scoreToAdvance: null,
+    timeLimitSeconds: 60,
   },
 ];

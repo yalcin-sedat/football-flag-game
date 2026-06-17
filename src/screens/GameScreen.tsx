@@ -2,6 +2,7 @@
 // [2026-06-16] Refactor: inline SVG/View'lar → Wheel/Ball/HUD/FeedbackMessage
 // [2026-06-16] Aşama 2b: ekran titremesi, renk flaşı, haptic + ses
 // [2026-06-17] Aşama 2c: dinamik level sistemi, level geçiş animasyonu, yüksek skor
+// [2026-06-17] Aşama 2c+: Level 4 countdown timer desteği
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
@@ -19,7 +20,6 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 import {
   getHitSegment,
   isMatch,
@@ -71,11 +71,18 @@ export default function GameScreen({ onGameOver }: Props) {
   const [ballLaunched, setBallLaunched]   = useState(false);
   const [gameOver, setGameOver]           = useState(false);
 
+  // --- Countdown timer (sadece timeLimitSeconds olan levellar için) ---
+  const [timeLeft, setTimeLeft]           = useState<number | null>(null);
+
   // --- Animasyon shared value'ları ---
-  const wheelRotation = useSharedValue(0);
-  const rotationRef   = useRef(0);
-  const ballY         = useSharedValue(BALL_Y_REST);
-  const shakeX        = useSharedValue(0);
+  const wheelRotation  = useSharedValue(0);
+  const rotationRef    = useRef(0);
+  const ballY          = useSharedValue(BALL_Y_REST);
+  const shakeX         = useSharedValue(0);
+
+  // gameState'in her zaman güncel kopyası — timer callback'lerinde stale closure önler
+  const gameStateRef = useRef(gameState);
+  useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
 
   // --- Çark dönüşünü level hızına göre başlat / yeniden başlat ---
   useEffect(() => {
@@ -108,6 +115,35 @@ export default function GameScreen({ onGameOver }: Props) {
     setBallCountry(LEVELS[levelIdx].countries[0]);
   }, [levelIdx]);
 
+  // Level değişince timer'ı başlat (timeLimitSeconds yoksa null — timer gösterilmez)
+  useEffect(() => {
+    const limit = LEVELS[levelIdx].timeLimitSeconds;
+    setTimeLeft(limit !== undefined ? limit : null);
+  }, [levelIdx]);
+
+  // Countdown — her saniye bir azalt
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0 || gameOver) return;
+    const timer = setTimeout(
+      () => setTimeLeft((t) => (t !== null ? t - 1 : null)),
+      1000,
+    );
+    return () => clearTimeout(timer);
+  }, [timeLeft, gameOver]);
+
+  // Süre doldu → game over (gameStateRef ile stale closure'dan kaçın)
+  useEffect(() => {
+    if (timeLeft !== 0 || gameOver) return;
+    const finalState = gameStateRef.current;
+    setGameOver(true);
+    cancelAnimation(wheelRotation);
+    sounds.gameover();
+    saveHighScoreIfBetter(finalState.score).then((isNew) => {
+      onGameOver(finalState.score, isNew);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft]);
+
   // --- Animasyon stilleri ---
   const shakeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shakeX.value }],
@@ -131,10 +167,8 @@ export default function GameScreen({ onGameOver }: Props) {
     setFlash(type);
 
     if (type === 'correct') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       sounds.correct();
     } else {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       sounds.wrong();
       triggerShake();
     }
@@ -146,7 +180,6 @@ export default function GameScreen({ onGameOver }: Props) {
   // --- Level atlama ---
   function handleLevelUp(nextIdx: number) {
     setIsLevelingUp(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     sounds.correct(); // kısa sevinç sesi
     // LevelUpBanner.onDone() çağrıldığında oyun devam eder (aşağıda)
     setLevelIdx(nextIdx);
@@ -162,7 +195,6 @@ export default function GameScreen({ onGameOver }: Props) {
     if (ballLaunched || gameOver || isLevelingUp) return;
 
     setBallLaunched(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     sounds.launch();
 
     // Topu yukarı fırlat
@@ -194,7 +226,6 @@ export default function GameScreen({ onGameOver }: Props) {
           setGameOver(true);
           cancelAnimation(wheelRotation);
           sounds.gameover();
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           // Yüksek skoru kaydet; sonuçla birlikte üst component'e bildir
           saveHighScoreIfBetter(newState.score).then((isNew) => {
             onGameOver(newState.score, isNew);
@@ -260,6 +291,13 @@ export default function GameScreen({ onGameOver }: Props) {
             <FeedbackMessage result={feedback} />
           </View>
 
+          {/* Countdown timer — sadece timeLimitSeconds olan levellar */}
+          {timeLeft !== null && (
+            <Text style={[styles.timer, timeLeft <= 10 && styles.timerUrgent]}>
+              {timeLeft}
+            </Text>
+          )}
+
           {/* Dokunma ipucu */}
           {!ballLaunched && !gameOver && !isLevelingUp && (
             <Text style={styles.hint}>Ekrana dokun — fırlat!</Text>
@@ -313,5 +351,15 @@ const styles = StyleSheet.create({
     bottom: 48,
     color: 'rgba(255,255,255,0.4)',
     fontSize: 14,
+  },
+  timer: {
+    position: 'absolute',
+    top: height * 0.55,
+    color: '#FFD700',
+    fontSize: 40,
+    fontWeight: 'bold',
+  },
+  timerUrgent: {
+    color: '#FF4444',
   },
 });
