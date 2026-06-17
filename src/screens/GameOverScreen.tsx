@@ -79,13 +79,13 @@ export default function GameOverScreen({ finalScore, isNewRecord = false, onRest
       <Animated.View style={[styles.scoreCard, scoreStyle]}>
         {isNewRecord && (
           <View style={styles.newRecordBadge}>
-            <Text style={styles.newRecordText}>🏆 YENİ REKOR!</Text>
+            <Text style={styles.newRecordText}>🏆 {strings.yeniRekor}</Text>
           </View>
         )}
         <Text style={styles.scoreLabel}>{strings.finalSkor}</Text>
         <Text style={styles.scoreValue}>{finalScore}</Text>
         {!isNewRecord && highScore > 0 && (
-          <Text style={styles.highScoreText}>En yüksek: {highScore}</Text>
+          <Text style={styles.highScoreText}>{strings.enYuksek(highScore)}</Text>
         )}
       </Animated.View>
 

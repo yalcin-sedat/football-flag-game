@@ -1,89 +1,95 @@
 # CLAUDE.md
 
-Bu dosya Claude Code için proje talimatlarını içerir. Her oturumda otomatik okunur.
+Bu dosya Claude Code / Codex oturumları için proje talimatlarını içerir.
 
 ## Proje Özeti
 
-**Flag Striker** — Knife Hit tarzından ilham alan, bayrak öğrenme temalı mobil arcade zamanlama oyunu. Oyuncu, dönen bir çarka top fırlatır. Topun üzerinde bir ülkenin BAYRAK deseni vardır; çarkın dilimlerinde ülke HARİTALARI (silüet + sembol renk) bulunur. Oyuncu, topun bayrağını çarktaki doğru ülke haritasına denk getirdiği anda dokunup fırlatır. Doğru eşleşmede ekranda hızlıca ülke adı + glow belirir (oyun durmaz) — böylece kullanıcı bayrak-harita-ülke eşleşmesini akış içinde öğrenir.
+**Flag Striker** — tek dokunuşla oynanan, dönen hedefe bayrak temalı pin/ok saplama üzerine kurulu mobil arcade zamanlama oyunu.
 
-## Çekirdek Mekanik (NET)
+Oyuncu ekrana dokunur; alttaki pin hedefe fırlar. Pin hedefe saplanır ve hedefle birlikte dönmeye devam eder. Yeni pin, daha önce saplanan pinlere çarparsa bölüm başarısız olur. Gerekli pin sayısı tamamlanınca level geçilir.
 
-- **Çark dilimleri:** ülke haritası (PNG silüet, sembol renkle boyalı). Bayrak DEĞİL.
-- **Top:** bir ülkenin bayrak deseni (PNG).
-- **Eşleştirme:** topun bayrağı = çarktaki o ülkenin haritası.
-- **Doğru:** "Mükemmel İsabet! Bu bayrak Meksika'ya ait." → kısa glow/parıltı, hızlıca kaybolur, oyun AKIŞI DURMAZ.
-- **Yanlış:** "Yanlış Bayrak!" → kısa uyarı, can -1, yeni hedefle devam.
-- Amaç: hızlı/akıcı arcade hissi + doğal bayrak öğrenme.
+Eski "bayrak desenli topu doğru ülke haritası dilimine fırlatma" fikri artık ana oyun değildir. Bayrak/dünya teması görsel kimlik, skin ve meta katman olarak korunabilir.
 
-## Teknoloji Yığını (KESİN)
+## Çekirdek Mekanik
 
-- Expo (en güncel SDK) + React Native + TypeScript
-- React Native Reanimated 4 + **react-native-worklets** (Reanimated 4 worklets paketini ZORUNLU ister)
-- React Native SVG (çark dilimleri, glow, arka plan, vektör efektler)
-- React Native Gesture Handler (dokunma)
-- **Görsel format kuralı:**
-  - Ülke HARİTALARI → **PNG** (mapsicon GitHub seti, ISO kodlu, siyah silüet → tintColor ile renklendirilir)
-  - Bayraklar → **PNG** (Flagpedia/FamFamFam, ISO kodlu)
-  - Çark, glow, arka plan, efektler → **SVG**
-- **Skia KULLANMA.** Sadece SVG + PNG.
+- **Tek input:** ekrana dokun.
+- **Hedef:** ortada dönen disk/rozet.
+- **Pin/ok:** alttan hedefe fırlar.
+- **Başarılı atış:** pin hedefe saplanır, hedefle birlikte dönmeye devam eder.
+- **Fail:** yeni pin mevcut pine çok yakın açıyla saplanmaya çalışırsa çarpışma olur.
+- **Level complete:** `requiredPins` kadar güvenli pin saplanır.
+- **Ana his:** hızlı, net, tekrar oynatan, "az kaldı" duygusu veren arcade.
 
-## Dil Kuralı (ÇOK ÖNEMLİ)
+## Teknoloji Yığını
 
-- Tüm UI metinleri **TÜRKÇE**. Almanca/İngilizce karışık KULLANMA.
-- Tüm metinler `src/data/strings.ts` içinde tek object'te (ileride çoklu dil için).
-- Örnek: `Mükemmel İsabet!`, `Bu bayrak Meksika'ya ait.`, `Yanlış Bayrak!`, `Puan`, `Can`, `Tekrar Oyna`.
+- Expo + React Native + TypeScript
+- React Native Reanimated 4 + `react-native-worklets`
+- React Native SVG
+- React Native Gesture Handler
+- AsyncStorage
+- Skia kullanma; SVG + View + PNG yeterli.
 
-## Telif Kuralları (BU TASARIMDA RİSK SIFIR)
+## Dil Kuralı
 
-Bu tasarımda gerçek kişi/marka içeriği YOKTUR, dolayısıyla telif riski yoktur:
-- İsim YOK, futbolcu YOK, oyuncu fotoğrafı YOK, kulüp/turnuva logosu YOK.
-- Sadece: ülke bayrakları (kamuya açık) + ülke haritaları (CC0/serbest) + ülke adları (faktüel coğrafya bilgisi).
+- Tüm UI metinleri Türkçe.
+- Tüm metinler `src/data/strings.ts` içinde tutulmalı.
+- İngilizce/Almanca karışık UI metni yazma.
 
-KURALLAR:
-- Görsel asset indirilirken lisansı kontrol edilmeli: "ticari kullanım + atıf gerekmez" olmalı.
-- Bayrak seti: Flagpedia veya FamFamFam (atıfsız, serbest).
-- Harita seti: mapsicon (GitHub) — LICENSE dosyası doğrulanmalı.
-- **UYARI (gelecek için):** İleride gerçek futbolcu ismi/fotoğrafı/oyuncu karakteri eklenirse telif durumu TAMAMEN değişir ve yeniden değerlendirilmelidir. Bu tasarımda bunlar KULLANILMAYACAK.
+## Telif ve Klon Riski
+
+- Twisty Arrow, Knife Hit, aa gibi oyunlardan sadece tür ve ürün dersi alınır.
+- İsim, ikon, mağaza görseli, level düzeni, hedef/pin görseli birebir kopyalanmaz.
+- Gerçek futbolcu, kulüp, turnuva, lisanslı logo kullanılmaz.
+- Bayrak asset'leri ve diğer görseller ticari kullanıma uygun lisansla doğrulanmalıdır.
 
 ## Kod Stili Kuralları
 
-- TypeScript; `any`'den kaçın.
-- Küçük, tek işe odaklı fonksiyonlar.
-- State basit başlasın (useState/useReducer). Zustand sadece gerekince.
-- Şu bölümlere MUTLAKA Türkçe açıklayıcı yorum: wheel rotation, target/top bayrağı üretme, tap to launch, collision/angle detection, eşleştirme kontrolü, score update, lives update, level progression.
+- TypeScript; `any` kullanma.
+- Oyun matematiğini saf fonksiyonlarda tut.
+- Şu konularda kısa Türkçe yorum bırak:
+  - hedef rotation hesabı
+  - pin impact açısı
+  - pin çarpışma toleransı
+  - level tamamlanma
+  - restart / fail akışı
+- Gereksiz abstraction ekleme; önce oynanabilir çekirdek.
 
 ## Mimari Kuralı
 
-- Aşama 1: tüm mantık `App.tsx` içinde, temiz ve bölünebilir yazılsın.
-- Aşama 2+: `ARCHITECTURE.md`'deki klasör yapısına geç.
-- Erken bölme yapma; önce çalışan kod.
+- Oyun state'i `GameScreen.tsx` içinde yönetilebilir.
+- Matematik ve kararlar `src/utils/gameLogic.ts` içinde saf fonksiyon olmalı.
+- Level verisi `src/data/levels.ts`.
+- Görsel hedef/pin component'leri `src/components/`.
+- Yeni çekirdek eski eşleştirme fonksiyonlarına bağımlı kalmamalı.
 
 ## Çalışma Prensipleri
 
-1. Her değişiklikten sonra oyun ÇALIŞIR kalmalı. Kırılırsa önce düzelt.
-2. `ROADMAP.md` sırasını takip et, aşama atlama.
-3. Kütüphane eklemeden önce `npx expo install` (npm install değil).
+1. Her değişiklikten sonra oyun çalışır kalmalı.
+2. `ROADMAP.md` sırasını takip et.
+3. Kütüphane eklemeden önce `npx expo install` kullan.
 4. Babel değişince cache temizle: `npx expo start -c`.
+5. Kod değişikliği sonrası `npx tsc --noEmit` çalıştır.
 
-## Yapma Listesi (DON'T)
+## Yapma Listesi
 
-- Backend (Supabase) → Aşama 3'ten önce ekleme.
-- Reklam (AdMob) → Aşama 5'ten önce ekleme.
-- Gerçek futbolcu ismi/fotoğrafı/oyuncu karakteri EKLEME.
-- İngilizce/Almanca UI metni yazma.
-- Gereksiz kütüphane ekleme.
+- Backend/Supabase'i leaderboard aşamasından önce ekleme.
+- Reklam/AdMob'u yayın aşamasından önce ekleme.
+- Twisty Arrow adını, ikonunu veya görsel kompozisyonunu kopyalama.
+- Eski bayrak-harita eşleştirme modeline yeni özellik ekleme; pivot yeni pin mekaniğine yapılacak.
+- Agresif reklam frekansını ürün kararına dönüştürme.
 
 ## Önemli Komutlar
 
 ```bash
-npx expo start -c          # cache temizleyerek başlat
-npx expo install <paket>   # Expo uyumlu kurulum
-npx tsc --noEmit           # tip kontrolü
+npx expo start -c
+npx expo install <paket>
+npx tsc --noEmit
 ```
 
 ## Referans Dosyalar
 
-- `PRD.md` — tam ürün vizyonu
-- `ARCHITECTURE.md` — dosya yapısı, component görevleri, asset yapısı
+- `PRD.md` — ürün vizyonu
+- `ARCHITECTURE.md` — dosya yapısı ve veri akışı
 - `ROADMAP.md` — aşamalı görev listesi
-- `SETUP.md` — sıfırdan kurulum + asset indirme
+- `PROGRESS.md` — canlı durum defteri
+- `SETUP.md` — kurulum notları

@@ -1,52 +1,61 @@
-// Oyun mantığı — saf fonksiyonlar, test edilebilir, state tutmaz
-import { Country } from '../data/countries';
+// Oyun mantığı — saf fonksiyonlar, test edilebilir, state tutmaz.
+// Yeni çekirdek: dönen hedefe pin saplama ve pinler arası açı çarpışması.
 
 export type GameState = {
   score: number;
+  streak: number;
+  placedPins: number[];
+  remainingPins: number;
   lives: number;
-  combo: number;
 };
 
-// Çarkın o anki rotation açısından hangi dilime vurulduğunu hesaplar.
-// rotation: derece (0–360 arası, saat yönü pozitif).
-// Top aşağıdan gelip çarkın ALTINA (180°) çarpar.
-// Çark R derece döndüğünde, altta duran orijinal dilim açısı = (180 - R).
-export function getHitSegment(rotation: number, segmentCount: number): number {
-  const normalized    = ((rotation % 360) + 360) % 360;
-  const segmentAngle  = 360 / segmentCount;
-  // Top çarkın altına (180°) çarpar; orijinal dilim açısını bul
-  const hitAngle = ((180 - normalized) % 360 + 360) % 360;
-  return Math.floor(hitAngle / segmentAngle) % segmentCount;
+export function normalizeAngle(angle: number): number {
+  return ((angle % 360) + 360) % 360;
 }
 
-// Topun bayrağı (ballCode) çarktaki vurulan dilimin ülkesiyle eşleşiyor mu?
-export function isMatch(hitCountryCode: string, ballCountryCode: string): boolean {
-  return hitCountryCode === ballCountryCode;
+export function angleDistance(a: number, b: number): number {
+  const diff = Math.abs(normalizeAngle(a) - normalizeAngle(b));
+  return Math.min(diff, 360 - diff);
 }
 
-// Mevcut hedef dışında rastgele yeni bir hedef ülke seçer
-export function nextBallTarget(countries: Country[], currentCode: string): Country {
-  const others = countries.filter((c) => c.code !== currentCode);
-  return others[Math.floor(Math.random() * others.length)];
+// Pin alttan geldiği için dünya uzayındaki temas noktası 180 derecedir.
+// Hedef R derece dönmüşse, hedefin lokal temas açısı (180 - R) olur.
+export function getImpactAngle(rotation: number): number {
+  return normalizeAngle(180 - rotation);
 }
 
-// Doğru/yanlış sonuca göre skor, combo ve can günceller
-export function updateScore(state: GameState, matched: boolean): GameState {
-  if (matched) {
-    const newCombo = state.combo + 1;
-    // 3 kombo: +2 bonus; normal: +1
-    const bonus = newCombo >= 3 ? 2 : 1;
-    return {
-      score: state.score + bonus,
-      lives: state.lives,
-      combo: newCombo,
-    };
-  } else {
-    // Yanlış: can -1, combo sıfırla
-    return {
-      score: state.score,
-      lives: state.lives - 1,
-      combo: 0,
-    };
-  }
+export function willCollideWithPins(
+  impactAngle: number,
+  placedPins: number[],
+  toleranceDeg: number,
+): boolean {
+  return placedPins.some((pinAngle) => angleDistance(impactAngle, pinAngle) <= toleranceDeg);
+}
+
+export function addPin(placedPins: number[], impactAngle: number): number[] {
+  return [...placedPins, normalizeAngle(impactAngle)];
+}
+
+export function isLevelComplete(placedPins: number[], requiredPins: number): boolean {
+  return placedPins.length >= requiredPins;
+}
+
+export function createLevelState(requiredPins: number, initialPins: number[] = []): GameState {
+  return {
+    score: 0,
+    streak: 0,
+    placedPins: initialPins.map(normalizeAngle),
+    remainingPins: requiredPins,
+    lives: 3,
+  };
+}
+
+export function applySafeHit(state: GameState, impactAngle: number): GameState {
+  return {
+    score: state.score + 1,
+    streak: state.streak + 1,
+    placedPins: addPin(state.placedPins, impactAngle),
+    remainingPins: Math.max(0, state.remainingPins - 1),
+    lives: state.lives,
+  };
 }

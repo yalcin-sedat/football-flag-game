@@ -14,19 +14,21 @@
 
 ## Hangi Agent Ne Zaman Aktif?
 
-| Hafta | Aktif Agent'lar |
+| Roadmap Aşaması | Aktif Agent'lar |
 |---|---|
-| Hafta 1 | Agent 1 (Oyun) + Agent 2 (Tasarım) |
-| Hafta 2 | Agent 1 + Agent 2 (juice, level, combo) |
-| Hafta 3 | Agent 3 (Backend) → sonra Agent 4 (Yayın) |
+| Yeni Aşama 1 | Agent 1 (pin saplama çekirdeği) |
+| Yeni Aşama 2 | Agent 2 (hedef/pin görsel sistemi) |
+| Yeni Aşama 3-5 | Agent 1 + Agent 2 (level paketi, menü uyumu, juice) |
+| Yeni Aşama 6 | Agent 3 (veri + leaderboard) |
+| Yeni Aşama 7 | Agent 4 (reklam + yayın) |
 
-> Agent 3 ve 4'ü erken AÇMA. İhtiyaç gelene kadar bekle.
+> Agent 3 ve 4'ü erken AÇMA. Yeni pin mekaniği oynanabilir hale gelmeden backend ve reklam işine geçme.
 
 ---
 
 ## 🎮 Agent 1 — Oyun Mantığı
 
-**Sorumluluk:** Oyunun "beyni". Çark dönüş mantığı, çarpışma/açı hesabı, bayrak-harita eşleştirme, skor/can, combo, level ilerleme.
+**Sorumluluk:** Oyunun "beyni". Dönen hedef mantığı, pin impact açısı, pin çarpışma toleransı, saplanmış pin listesi, skor/streak, level ilerleme.
 
 **Sahip olduğu dosyalar:** `src/utils/gameLogic.ts`, `src/screens/GameScreen.tsx`, `src/data/levels.ts`, `src/data/countries.ts`
 
@@ -35,17 +37,18 @@
 **Başlangıç komutu (kopyala-yapıştır):**
 ```
 Sen Agent 1 - Oyun Mantığı'sın. Önce PROGRESS.md, CLAUDE.md ve ARCHITECTURE.md
-oku. Görevin: ROADMAP.md Aşama 1'deki oyun mantığı kısmı. Çark dönüşü, çarpışma/
-açı hesabı, bayrak-harita eşleştirme, skor/can güncelleme. gameLogic.ts'i saf
-fonksiyonlarla yaz (test edilebilir). Türkçe yorum ekle. Bitince PROGRESS.md'ye
-yaz ve commit at. Sadece kendi sahip olduğun dosyalara dokun.
+oku. Görevin: ROADMAP.md Aşama 1'deki yeni pin saplama çekirdeği. Hedef rotation,
+impact açısı, pin çarpışması, placedPins, remainingPins, level complete ve hızlı
+restart akışını kur. gameLogic.ts'i saf fonksiyonlarla yaz (test edilebilir).
+Türkçe yorum ekle. Bitince PROGRESS.md'ye yaz ve commit at. Sadece kendi sahip
+olduğun dosyalara dokun.
 ```
 
 ---
 
 ## 🎨 Agent 2 — Tasarım / UI
 
-**Sorumluluk:** Görünen her şey. Çark çizimi (SVG), harita/bayrak yerleşimi, animasyonlar (Reanimated), ana menü, renkler, "juice" efektleri (glow, shake, parıltı), geri bildirim mesajları.
+**Sorumluluk:** Görünen her şey. Dönen hedef çizimi, pin/ok görseli, saplanmış pinlerin yerleşimi, animasyonlar (Reanimated), ana menü, renkler, "juice" efektleri (glow, shake, parıltı), geri bildirim mesajları.
 
 **Sahip olduğu dosyalar:** `src/components/*` (Wheel, Ball, HUD, FeedbackMessage), `src/screens/*` (GameScreen HARİÇ — orası Agent 1'in), `src/theme/*`
 
@@ -54,10 +57,10 @@ yaz ve commit at. Sadece kendi sahip olduğun dosyalara dokun.
 **Başlangıç komutu:**
 ```
 Sen Agent 2 - Tasarım/UI'sın. Önce PROGRESS.md, CLAUDE.md ve ARCHITECTURE.md
-oku. Görevin: çark görseli (SVG dilimler + tint'li harita PNG), bayrak desenli
-top, HUD, FeedbackMessage ve ana menü. Reanimated ile animasyonlar. Neon arcade
-stil (theme/colors.ts). GameScreen'in MANTIĞINA dokunma (o Agent 1'in) — sadece
-görsel component'leri sağla. Bitince PROGRESS.md'ye yaz ve commit at.
+oku. Görevin: yeni dönen hedef, pin/ok görseli, saplanmış pin render'ı, sade HUD,
+FeedbackMessage ve ana menü uyumu. Reanimated ile animasyonlar. Minimal premium
+arcade stil (theme/colors.ts). GameScreen'in MANTIĞINA dokunma (o Agent 1'in) —
+sadece görsel component'leri sağla. Bitince PROGRESS.md'ye yaz ve commit at.
 ```
 
 > Not: Agent 1 ve 2 birlikte çalışır. Agent 1 mantığı kurar, Agent 2 görseli sağlar. Arayüz noktası: component prop'ları (ARCHITECTURE.md'deki veri akışı). İkisi de prop isimlerini PROGRESS.md'de netleştirsin.
@@ -72,14 +75,15 @@ görsel component'leri sağla. Bitince PROGRESS.md'ye yaz ve commit at.
 
 **Okuması gerekenler:** PROGRESS.md, CLAUDE.md, PRD.md (bölüm 10), ARCHITECTURE.md (utils/storage)
 
-**NE ZAMAN:** Aşama 3 (Hafta 3). Daha önce AÇMA.
+**NE ZAMAN:** Yeni Aşama 6. Daha önce AÇMA.
 
 **Başlangıç komutu:**
 ```
 Sen Agent 3 - Backend/Veri'sin. Önce PROGRESS.md, CLAUDE.md, PRD.md oku.
-Görevin: Aşama 3 — önce local storage ile yüksek skor/ayar kaydı, sonra Supabase
-ile leaderboard ve kullanıcı adı. Önce local, sonra buluta bağla. Oyun mantığına
-ve UI'a dokunma — sadece veri katmanı. Bitince PROGRESS.md'ye yaz ve commit at.
+Görevin: Yeni Aşama 6 — önce local storage ile highestLevel, bestStreak, totalPins
+ve ayar kaydı; sonra Supabase ile leaderboard ve kullanıcı adı. Önce local, sonra
+buluta bağla. Oyun mantığına ve UI'a dokunma — sadece veri katmanı. Bitince
+PROGRESS.md'ye yaz ve commit at.
 ```
 
 ---
@@ -92,14 +96,15 @@ ve UI'a dokunma — sadece veri katmanı. Bitince PROGRESS.md'ye yaz ve commit a
 
 **Okuması gerekenler:** PROGRESS.md, CLAUDE.md, PRD.md (bölüm 12, 13)
 
-**NE ZAMAN:** Aşama 5 (en son). Oyun tamamen bitmeden AÇMA.
+**NE ZAMAN:** Yeni Aşama 7 (en son). Oyun tamamen bitmeden AÇMA.
 
 **Başlangıç komutu:**
 ```
 Sen Agent 4 - Yayın/Operasyon'sun. Önce PROGRESS.md, CLAUDE.md, PRD.md oku.
-Görevin: Aşama 5 — AdMob (geçişli + ödüllü reklam), EAS Build yapılandırması,
-app ikonu/splash, basit gizlilik politikası, store hazırlığı. Oyun koduna minimum
-dokun (sadece reklam çağrı noktaları). Bitince PROGRESS.md'ye yaz ve commit at.
+Görevin: Yeni Aşama 7 — AdMob (adil frekanslı geçişli + ödüllü reklam), EAS Build
+yapılandırması, yeni hedef+pin ikon/splash, basit gizlilik politikası, store
+hazırlığı. Oyun koduna minimum dokun (sadece reklam çağrı noktaları). Bitince
+PROGRESS.md'ye yaz ve commit at.
 ```
 
 ---

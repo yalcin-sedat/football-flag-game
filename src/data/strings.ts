@@ -1,32 +1,44 @@
-// Tüm Türkçe UI metinleri — ileride çoklu dil için tek kaynak
-// [2026-06-16] Agent 2: oyna/gunlukGorev/siralama/ayarlar/anaMenue/finalSkor eklendi
+// All UI strings — single source for future i18n
+// [2026-06-17] Agent 2: converted all strings from Turkish to English
 export const strings = {
-  // Oyun içi
-  dogruIsabet:  'Mükemmel İsabet!',
-  bayrakBilgisi: (ulkeAdi: string) => `Bu bayrak ${ulkeAdi}'ya ait.`,
-  yanlisBayrak: 'Yanlış Bayrak!',
-  puan:         'Puan',
-  can:          'Can',
-  seviye:       'Seviye',
-  yaniyorsun:   'Yanıyorsun! 🔥',
-  combo:        (n: number) => `${n} Kombo!`,
+  // In-game
+  dogruIsabet:  'Perfect Hit!',
+  bayrakBilgisi: (ulkeAdi: string) => `This flag belongs to ${ulkeAdi}.`,
+  yanlisBayrak: 'Wrong Flag!',
+  pinSaplandi:  'Pin Stuck!',
+  carpisma:     'Collision!',
+  kalanPin:     'Pins Left',
+  puan:         'Score',
+  can:          'Lives',
+  seviye:       'Level',
+  yaniyorsun:   'On Fire! 🔥',
+  combo:        (n: number) => `${n} Combo!`,
+  tapToThrow:   'Tap to throw!',
 
-  // Navigasyon / genel
-  tekrarOyna:   'Tekrar Oyna',
-  oyunBitti:    'Oyun Bitti',
-  anaMenue:     'Ana Menü',
-  finalSkor:    'Final Skor',
+  // Navigation / general
+  tekrarOyna:   'Play Again',
+  oyunBitti:    'GAME OVER',
+  anaMenue:     'Main Menu',
+  finalSkor:    'Final Score',
 
   // Level
-  levelAtladi:  (n: number) => `SEVİYE ${n}`,
-  carkHizlandi: 'Çark hızlandı!',
-  yeniRekor:    'YENİ REKOR!',
-  enYuksek:     (n: number) => `En yüksek: ${n}`,
+  levelAtladi:  (n: number) => `LEVEL ${n}`,
+  levelLabel:   (n: number) => `LEVEL ${n}`,
+  levelLabelPrefix: 'LEVEL',
+  carkHizlandi: 'Speed up!',
+  yeniRekor:    'NEW RECORD!',
+  enYuksek:     (n: number) => `Best: ${n}`,
 
-  // Ana menü
-  oyna:         'OYNA',
-  gunlukGorev:  'Günlük Görev',
-  siralama:     'Sıralama',
-  karakterler:  'Karakterler',
-  ayarlar:      'Ayarlar',
+  // Home menu
+  oyna:         'PLAY',
+  gunlukGorev:  'Daily Quest',
+  siralama:     'Leaderboard',
+  karakterler:  'Pins',
+  ayarlar:      'Settings',
+  yakinda:      'Coming soon.',
+  toplar:       'PINS',
+  brandKicker:  'WORLD FLAG',
+  brandTitle:   'STRIKER',
+  worldArena:   'WORLD ARENA',
+  rankStriker:  'STRIKER',
 };

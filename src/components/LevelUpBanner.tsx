@@ -1,17 +1,18 @@
-// Level atlama banner'ı — ekran ortasında belirip kaybolan animasyonlu kart
-// visible prop true olduğunda tetiklenir; 1400ms sonra onDone çağrılır.
+// Level-up banner — floats up from near the pin launch point, fades out in place
+// visible=true → slide up + fade in → hold → fade out, then onDone fires
 import React, { useEffect } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Dimensions, StyleSheet, Text } from 'react-native';
 import Animated, {
-  useSharedValue,
+  Easing,
+  runOnJS,
   useAnimatedStyle,
+  useSharedValue,
+  withDelay,
   withSequence,
   withTiming,
-  withDelay,
-  runOnJS,
-  Easing,
 } from 'react-native-reanimated';
 import { colors } from '../theme/colors';
+import { strings } from '../data/strings';
 
 type LevelUpBannerProps = {
   level: number;
@@ -19,92 +20,91 @@ type LevelUpBannerProps = {
   onDone: () => void;
 };
 
-const TOTAL_DURATION = 1400; // ms — oyun bu süre donar
+const { width, height } = Dimensions.get('window');
+const BANNER_H  = 62;
+const TOTAL_MS  = 1450;
+// Resting offset (translateY=0 lands here); slides in from +50px below
+const RISE_PX   = 50;
 
 export default function LevelUpBanner({ level, visible, onDone }: LevelUpBannerProps) {
-  const opacity = useSharedValue(0);
-  const scale   = useSharedValue(0.5);
+  const translateY = useSharedValue(RISE_PX);
+  const opacity    = useSharedValue(0);
 
   useEffect(() => {
     if (!visible) return;
 
-    // Hızlı giriş → tutma → çıkış
-    opacity.value = withSequence(
-      withTiming(1,   { duration: 200, easing: Easing.out(Easing.quad) }),
-      withDelay(900,
-        withTiming(0, { duration: 300, easing: Easing.in(Easing.quad) }),
+    // Rise from below + fade in → hold → fade out
+    translateY.value = withSequence(
+      withTiming(0,       { duration: 260, easing: Easing.out(Easing.cubic) }),
+      withDelay(930,
+        withTiming(RISE_PX, { duration: 260, easing: Easing.in(Easing.cubic) }),
       ),
     );
-    scale.value = withSequence(
-      withTiming(1.05, { duration: 220, easing: Easing.out(Easing.back(1.6)) }),
-      withTiming(1,    { duration: 100 }),
-      withDelay(780,
-        withTiming(0.8, { duration: 300, easing: Easing.in(Easing.quad) }),
+    opacity.value = withSequence(
+      withTiming(1, { duration: 220 }),
+      withDelay(930,
+        withTiming(0, { duration: 260 }),
       ),
     );
 
-    // Animasyon bitince oyunu devam ettir
-    const timer = setTimeout(() => runOnJS(onDone)(), TOTAL_DURATION);
+    const timer = setTimeout(() => runOnJS(onDone)(), TOTAL_MS);
     return () => clearTimeout(timer);
   }, [visible, level]);
 
   const animStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
     opacity:   opacity.value,
-    transform: [{ scale: scale.value }],
   }));
 
   if (!visible) return null;
 
   return (
-    <Animated.View pointerEvents="none" style={[styles.container, animStyle]}>
-      <Text style={styles.sub}>TEBRİKLER</Text>
-      <Text style={styles.title}>SEVİYE {level}</Text>
-      <Text style={styles.desc}>Çark hızlandı!</Text>
+    <Animated.View pointerEvents="none" style={[styles.banner, animStyle]}>
+      <Text style={styles.text}>
+        {strings.levelLabelPrefix} <Text style={styles.num}>{level}</Text>
+        {'  '}
+        <Text style={styles.emoji}>🎉</Text>
+      </Text>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  banner: {
     position: 'absolute',
+    // sit just above the pin launch zone (PIN_Y_REST ≈ height * 0.78)
+    top: height * 0.72 - BANNER_H,
     alignSelf: 'center',
-    top: '38%',
-    paddingHorizontal: 36,
-    paddingVertical: 22,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    borderWidth: 2,
+    width: width * 0.67,
+    height: BANNER_H,
+    borderRadius: 14,
+    backgroundColor: 'rgba(14,10,30,0.92)',
+    borderWidth: 1.5,
     borderColor: colors.neonGold,
     alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: colors.neonGold,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
-    shadowRadius: 20,
-    elevation: 12,
+    shadowRadius: 14,
+    elevation: 14,
     zIndex: 50,
   },
-  sub: {
-    color: colors.textMuted,
-    fontSize: 11,
+  text: {
+    color: '#ffffff',
+    fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 3,
+    letterSpacing: 2,
     textTransform: 'uppercase',
-    marginBottom: 4,
   },
-  title: {
+  num: {
     color: colors.neonGold,
-    fontSize: 38,
     fontWeight: '900',
-    letterSpacing: 4,
     textShadowColor: colors.neonGold,
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 14,
+    textShadowRadius: 8,
   },
-  desc: {
-    color: colors.neonBlue,
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 1.5,
-    marginTop: 6,
+  emoji: {
+    fontSize: 16,
   },
 });

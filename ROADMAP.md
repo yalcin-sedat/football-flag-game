@@ -1,80 +1,109 @@
-# ROADMAP.md — Hızlandırılmış Geliştirme Planı (2-3 Hafta)
+# ROADMAP.md — Yeni Oyun Yönü Geliştirme Planı
 
-> Claude Code: Görevleri SIRAYLA yap. Bir aşama bitmeden sonrakine geçme.
-> Her görev sonrası `npx expo start -c` ile oyunun çalıştığını doğrula.
-> Tamamlananları [x] ile işaretle.
+> Yeni yön: bayrak-harita eşleştirme oyunu yerine, Twisty Arrow / Knife Hit ailesinden ilham alan **dönen hedefe pin saplama** arcade oyunu.
+> Her görev sonrası `npx tsc --noEmit` ile tip kontrolü yap. Oyun davranışı değiştiğinde `npx expo start -c` ile oynanabilirliği kontrol et.
 
-## HAFTA 1 — Çekirdek Oyun + Görsel İskelet
+## Aşama 0 — Doküman ve Karar Kilidi
 
-### Aşama 0: Kurulum + Asset (Gün 1)
-- [ ] `SETUP.md`'deki kurulumu uygula (Expo + Reanimated 4 + worklets + SVG + Gesture Handler)
-- [ ] Bayrak PNG'lerini indir (Flagpedia/FamFamFam) → `assets/flags/` (ISO kodlu)
-- [ ] Harita PNG'lerini indir (mapsicon GitHub) → `assets/maps/` (ISO kodlu)
-- [ ] Her iki setin LICENSE'ını doğrula (ticari + atıfsız)
+- [x] Twisty Arrow araştırma raporu incelendi.
+- [x] Yeni yön kararı: tek dokunuşlu dönen hedef + pin/ok saplama.
+- [x] PRD, mimari ve roadmap yeni mekaniğe göre güncellendi.
 
-### Aşama 1: Çalışan Çekirdek Mekanik (Gün 2-4)
-- [ ] `src/data/strings.ts` — tüm Türkçe metinler
-- [ ] `src/data/countries.ts` — Grup A ülkeleri (kod, ad, renk)
-- [ ] Asset map'leri (flagImages[code], mapImages[code])
-- [ ] Dönen çark: 4 dilim, her dilimde tint'li harita PNG, yavaş döner (SVG + Reanimated)
-- [ ] Bayrak desenli top (alt orta, sabit)
-- [ ] Tap ile fırlatma animasyonu
-- [ ] Çarpışma/açı hesabı + eşleştirme kontrolü (gameLogic.ts)
-- [ ] Doğru/yanlış geri bildirim mesajı (akışı durdurmadan, glow/flash)
-- [ ] Puan + can güncelleme, yeni hedef bayrak üretme
-- [ ] Game Over ekranı (Tekrar Oyna)
-- [ ] **Doğrulama:** Telefonda oynanabilir, eşleştirme doğru çalışıyor, akış durmuyor
+## Aşama 1 — Çekirdek Mekanik Pivotu
 
-### Aşama 2a: Görsel Cila + Ana Menü (Gün 5-7)
-- [ ] `theme/colors.ts` — neon paleti
-- [ ] Ana menü (Oyna, Günlük Görev, Sıralama, Karakterler, Ayarlar)
-- [ ] Stadyum arka planı (gradient, saha çizgileri, tribün — SVG)
-- [ ] Ekran navigasyonu
-- [ ] Component'lere bölme (Wheel, Ball, HUD, FeedbackMessage)
-- [ ] **Doğrulama:** Menü → oyun → Game Over → Menü akışı çalışıyor
+- [x] Eski eşleştirme mantığını oyun çekirdeğinden çıkar.
+- [x] `src/utils/gameLogic.ts` içine pin açısı ve çarpışma fonksiyonları ekle:
+  - `normalizeAngle`
+  - `getImpactAngle`
+  - `willCollideWithPins`
+  - `addPin`
+  - `isLevelComplete`
+- [x] `src/data/levels.ts` yapısını yeni parametrelere çevir:
+  - `requiredPins`
+  - `rotationDuration`
+  - `direction`
+  - `collisionToleranceDeg`
+  - `initialPins`
+  - `speedPattern`
+- [x] `GameScreen.tsx` state'ini yeni oyuna göre değiştir:
+  - current level
+  - placed pin açıları
+  - remaining pins
+  - score / streak
+  - fail / level complete
+- [x] Tap ile pin fırlatma animasyonu.
+- [x] Pin hedefe saplanınca hedefle birlikte dönmeye devam etmeli.
+- [x] Çarpışma olursa fail/game over.
+- [x] Gerekli pin sayısı tamamlanınca level geçişi.
+- [ ] Doğrulama: telefonda oynanabilirlik, çarpışma hissi ve restart temposu test edilecek.
 
-## HAFTA 2 — Oyun Derinliği + His
+## Aşama 2 — Yeni Görsel Sistem
 
-### Aşama 2b: His ("Juice") + Ses (Gün 8-10)
-- [ ] Doğru glow + parıltı, yanlış kırmızı flash + ekran shake
-- [ ] Skor scale, kalp shake animasyonları
-- [ ] Ses efektleri (tap, fırlatma, doğru, yanlış, game over) — CC0
-- [ ] Ayarlar ekranı (ses aç/kapa)
-- [ ] **Doğrulama:** Oyun tatmin edici ve akıcı
+- [ ] `Wheel.tsx` veya yeni `Target.tsx`: ülke dilimleri yerine sade dönen hedef diski.
+- [ ] Yeni `Pin.tsx` / `Arrow.tsx`: alttan fırlayan ve saplandıktan sonra hedefle dönen pin.
+- [ ] Saplanmış pinlerin hedef çevresinde doğru açıyla render edilmesi.
+- [ ] Kalan pin sayısı için sade dikey/alt sayaç.
+- [ ] HUD sadeleştirme: level, remaining pins, streak/score.
+- [ ] Eski bayrak topu ve harita görsellerini ana oyun ekranından kaldır veya skin/theme katmanına taşı.
+- [ ] Başarı efekti: küçük spark/glow.
+- [ ] Fail efekti: kırmızı flash + shake.
+- [ ] Doğrulama: küçük telefon ekranında pinler ve hedef net okunuyor.
 
-### Aşama 2c: Seviye Sistemi + Combo (Gün 11-13)
-- [ ] `src/data/levels.ts` — Seviye 1-4 (dilim sayısı, hız, yön, ülke seti)
-- [ ] Seviye geçişi + Grup yapısı
-- [ ] Combo sistemi (3→+2, 5→glow, 10→"Yanıyorsun!")
-- [ ] Level sonu yıldız + bayrak-ülke özet kartı (opsiyonel öğrenme pekiştirme)
-- [ ] Yüksek skor local storage
-- [ ] **Doğrulama:** Çok seviyeli, artan zorluk, tanınması zor ülkeler ileri seviyelerde
+## Aşama 3 — Level Paketi ve Zorluk Eğrisi
 
-## HAFTA 3 — Sosyal + Para + Yayın
+- [ ] 30-50 level tanımı oluştur.
+- [ ] İlk 5 level: tutorial'sız öğretim, düşük hız, geniş tolerans.
+- [ ] 6-15: daha çok pin, daha hızlı dönüş.
+- [ ] 16-25: hazır engel pinleri.
+- [ ] 26-35: yön değişimi veya dur-kalk ritmi.
+- [ ] 36+: dar tolerans ve karışık hız pattern'leri.
+- [ ] Level complete banner'ı yeni oyuna göre güncelle.
+- [ ] Local progress: en yüksek açılan level, best streak.
 
-### Aşama 3: Leaderboard + Kullanıcı (Gün 14-16)
-- [ ] Kullanıcı adı girme (önce local)
-- [ ] Supabase kurulumu + skor tablosu
-- [ ] Leaderboard ekranı (Top 10, kendi sıran, rozetler, filtreler)
-- [ ] Skoru gönderme
-- [ ] **Doğrulama:** Skor kaydediliyor ve sıralamada görünüyor
+## Aşama 4 — Menü ve Meta Uyumlama
 
-### Aşama 4: Cila (Gün 17-18) — zaman kalırsa
-- [ ] Top/çark temaları (skin)
-- [ ] Günlük görev
-- [ ] Particle efektleri
+- [ ] HomeScreen marka metinlerini yeni oyun kimliğine göre sadeleştir.
+- [ ] "Toplar" koleksiyonunu "Pinler" veya "Temalar" olarak değiştir.
+- [ ] Coin/gem alanı kalacaksa skin ekonomisine bağlanacak şekilde adlandır.
+- [ ] GameOver ekranını level/streak odaklı yap.
+- [ ] Ayarlar ekranı: ses/haptic aç-kapa.
+- [ ] Günlük görev fikri: "12 pin sapla", "3 level üst üste geç", "tek can challenge".
 
-### Aşama 5: Para + Yayın (Gün 19-21)
-- [ ] AdMob (geçişli + ödüllü)
-- [ ] App ikonu (1024×1024) + splash
-- [ ] Gizlilik politikası (basit web sayfası)
-- [ ] EAS Build test build
-- [ ] Store hesapları (Apple 99$, Google 25$)
-- [ ] Store görselleri + Türkçe açıklama
-- [ ] **Doğrulama:** Mağazaya yüklenebilir build hazır
+## Aşama 5 — Ses, Haptic ve Cila
+
+- [ ] Pin fırlatma sesi.
+- [ ] Saplanma sesi.
+- [ ] Çarpışma/fail sesi.
+- [ ] Level complete sesi.
+- [ ] Haptic: tap hafif, saplanma medium, fail error.
+- [ ] Restart akışını 1 saniyeden kısa hissettirecek animasyon temposu.
+- [ ] Arka plan müziği varsa ayardan kapanmalı ve cihaz müziğiyle çakışmamalı.
+
+## Aşama 6 — Leaderboard ve Veri
+
+- [ ] Local storage alanları:
+  - highestLevel
+  - bestStreak
+  - totalPins
+  - noAdsPurchased ileride
+- [ ] Supabase leaderboard:
+  - top level
+  - best streak
+  - total score
+- [ ] Kullanıcı adı veya anonim oyuncu adı.
+
+## Aşama 7 — Para ve Yayın
+
+- [ ] AdMob interstitial: agresif olmayan frekans.
+- [ ] Rewarded ad: ikinci şans veya streak koruma.
+- [ ] Reklamsız sürüm IAP tasarımı.
+- [ ] Yeni app icon: dönen hedef + bayrak pin.
+- [ ] Splash ve store ekran görüntüleri yeni mekanikle uyumlu.
+- [ ] Gizlilik politikası.
+- [ ] EAS test build.
 
 ## Notlar
-- 2-3 hafta agresif. Aşama 0-3 gerçekçi; 4-5 (özellikle store onayları) taşabilir — normal.
-- Her aşama sonunda Git commit (bkz. SETUP.md).
-- Harita tanınmazsa o ülkeyi daha tanınır biriyle değiştir.
-- Takılırsan: çalışan son haline dön, küçük adımla ilerle.
+
+- Yeni oyunda ana risk mekanik değil, his: çarpışma toleransı, animasyon temposu ve restart sürtünmesi.
+- Twisty Arrow birebir kopyalanmaz; "tek dokunuş timing arcade" türünden ders alınır.
+- Eski bayrak/harita asset'leri tamamen çöpe atılmayabilir; skin, tema, hedef rozeti veya koleksiyon katmanında kullanılabilir.

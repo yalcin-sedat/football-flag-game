@@ -1,8 +1,4 @@
-// Çekirdek oyun ekranı — tüm oyun mantığı burada; görsel componentler ayrı
-// [2026-06-16] Refactor: inline SVG/View'lar → Wheel/Ball/HUD/FeedbackMessage
-// [2026-06-16] Aşama 2b: ekran titremesi, renk flaşı, haptic + ses
-// [2026-06-17] Aşama 2c: dinamik level sistemi, level geçiş animasyonu, yüksek skor
-// [2026-06-17] Aşama 2c+: Level 4 countdown timer desteği
+// Çekirdek oyun ekranı — yeni pivot: dönen hedefe pin/ok saplama.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
@@ -13,309 +9,353 @@ import {
 } from 'react-native';
 import Animated, {
   cancelAnimation,
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
   withSequence,
   withTiming,
-  Easing,
 } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import { LEVELS, LevelConfig } from '../data/levels';
 import {
-  getHitSegment,
-  isMatch,
-  nextBallTarget,
-  updateScore,
+  applySafeHit,
+  createLevelState,
   GameState,
+  getImpactAngle,
+  isLevelComplete,
+  willCollideWithPins,
 } from '../utils/gameLogic';
 import { sounds } from '../utils/sounds';
 import { saveHighScoreIfBetter } from '../utils/storage';
-import { LEVELS, LevelConfig } from '../data/levels';
-import Wheel from '../components/Wheel';
-import Ball from '../components/Ball';
+import Target from '../components/Target';
+import Pin, { PIN_W, PIN_H } from '../components/Pin';
 import HUD from '../components/HUD';
-import FeedbackMessage, { FeedbackResult } from '../components/FeedbackMessage';
 import ScreenFlash, { FlashType } from '../components/ScreenFlash';
 import LevelUpBanner from '../components/LevelUpBanner';
+import SpaceBackground from '../components/SpaceBackground';
+import { strings } from '../data/strings';
 
 const { width, height } = Dimensions.get('window');
 
-// Çark sabitleri (konum değişmez; boyut/içerik level'a göre değişir)
-const WHEEL_RADIUS = 130;
-const WHEEL_CX = width / 2;
-const WHEEL_CY = height * 0.38;
+const TARGET_RADIUS = 115;
+const TARGET_CX = width / 2;
+const TARGET_CY = height * 0.38;
+const PIN_Y_REST = height * 0.78;
+const PIN_Y_HIT = TARGET_CY + TARGET_RADIUS + 20;
 
-// Top sabitleri
-const BALL_Y_REST    = height * 0.78;
-const BALL_Y_HIT     = WHEEL_CY + WHEEL_RADIUS + 30;
-const LAUNCH_DURATION = 350;
 
 type Props = {
   onGameOver: (finalScore: number, isNewRecord: boolean) => void;
 };
 
+function buildLevelState(level: LevelConfig, previous?: GameState): GameState {
+  return {
+    ...createLevelState(level.requiredPins, level.initialPins),
+    score: previous?.score ?? 0,
+    streak: previous?.streak ?? 0,
+    lives: previous?.lives ?? 3,
+  };
+}
+
 export default function GameScreen({ onGameOver }: Props) {
-  // --- Level state ---
-  const [levelIdx, setLevelIdx]           = useState(0);
-  const [isLevelingUp, setIsLevelingUp]   = useState(false);
-  const levelRef = useRef<LevelConfig>(LEVELS[0]);
+  const [levelIdx, setLevelIdx] = useState(0);
+  const [isLevelingUp, setIsLevelingUp] = useState(false);
+  const [gameState, setGameState] = useState<GameState>(() => buildLevelState(LEVELS[0]));
+  const [flash, setFlash] = useState<FlashType>(null);
+  const [pinLaunched, setPinLaunched] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
 
-  const level         = LEVELS[levelIdx];
-  const wheelCountries = level.countries;
-  const segmentCount   = level.countries.length;
-
-  // --- Oyun state ---
-  const [gameState, setGameState]         = useState<GameState>({ score: 0, lives: 3, combo: 0 });
-  const [ballCountry, setBallCountry]     = useState(wheelCountries[0]);
-  const [feedback, setFeedback]           = useState<FeedbackResult>({ type: null });
-  const [flash, setFlash]                 = useState<FlashType>(null);
-  const [ballLaunched, setBallLaunched]   = useState(false);
-  const [gameOver, setGameOver]           = useState(false);
-
-  // --- Countdown timer (sadece timeLimitSeconds olan levellar için) ---
-  const [timeLeft, setTimeLeft]           = useState<number | null>(null);
-
-  // --- Animasyon shared value'ları ---
-  const wheelRotation  = useSharedValue(0);
-  const rotationRef    = useRef(0);
-  const ballY          = useSharedValue(BALL_Y_REST);
-  const shakeX         = useSharedValue(0);
-
-  // gameState'in her zaman güncel kopyası — timer callback'lerinde stale closure önler
+  const level = LEVELS[levelIdx];
+  const levelRef = useRef<LevelConfig>(level);
   const gameStateRef = useRef(gameState);
-  useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
+  // Bu levelde çarpışma/can kaybı oldu mu — perfect level banner kontrolü için
+  const levelLostLife = useRef(false);
 
-  // --- Çark dönüşünü level hızına göre başlat / yeniden başlat ---
+  const targetRotation = useSharedValue(0);
+  const rotationRef = useRef(0);
+  const pinY = useSharedValue(PIN_Y_REST);
+  const shakeX = useSharedValue(0);
+  const targetShakeY = useSharedValue(0);
+
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+
   useEffect(() => {
     levelRef.current = LEVELS[levelIdx];
-    cancelAnimation(wheelRotation);
-    wheelRotation.value = 0; // sıfırla — hız değişince tutarlı başlangıç
-
-    wheelRotation.value = withRepeat(
-      withTiming(360, {
-        duration: levelRef.current.rotationDuration,
-        easing: Easing.linear,
-      }),
-      -1,
-      false,
-    );
-
-    return () => cancelAnimation(wheelRotation);
+    levelLostLife.current = false;
+    setGameState((previous) => buildLevelState(LEVELS[levelIdx], previous));
   }, [levelIdx]);
 
-  // Rotation değerini JS'e kopyala (çarpışma hesabı için)
+  useEffect(() => {
+    const directionMultiplier = level.direction === 'clockwise' ? 1 : -1;
+    cancelAnimation(targetRotation);
+    targetRotation.value = 0;
+    if (level.speedPattern === 'switchDirection') {
+      targetRotation.value = withRepeat(
+        withSequence(
+          withTiming(360 * directionMultiplier, {
+            duration: level.rotationDuration,
+            easing: Easing.inOut(Easing.sin),
+          }),
+          withTiming(0, {
+            duration: level.rotationDuration,
+            easing: Easing.inOut(Easing.sin),
+          }),
+        ),
+        -1,
+        false,
+      );
+    } else {
+      targetRotation.value = withRepeat(
+        withTiming(360 * directionMultiplier, {
+          duration: level.rotationDuration,
+          easing: Easing.linear,
+        }),
+        -1,
+        false,
+      );
+    }
+
+    return () => cancelAnimation(targetRotation);
+  }, [levelIdx, level.direction, level.rotationDuration, level.speedPattern]);
+
   useEffect(() => {
     const interval = setInterval(() => {
-      rotationRef.current = wheelRotation.value % 360;
+      rotationRef.current = targetRotation.value % 360;
     }, 16);
     return () => clearInterval(interval);
   }, []);
 
-  // Level değişince top ülkesini sıfırla
-  useEffect(() => {
-    setBallCountry(LEVELS[levelIdx].countries[0]);
-  }, [levelIdx]);
-
-  // Level değişince timer'ı başlat (timeLimitSeconds yoksa null — timer gösterilmez)
-  useEffect(() => {
-    const limit = LEVELS[levelIdx].timeLimitSeconds;
-    setTimeLeft(limit !== undefined ? limit : null);
-  }, [levelIdx]);
-
-  // Countdown — her saniye bir azalt
-  useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0 || gameOver) return;
-    const timer = setTimeout(
-      () => setTimeLeft((t) => (t !== null ? t - 1 : null)),
-      1000,
-    );
-    return () => clearTimeout(timer);
-  }, [timeLeft, gameOver]);
-
-  // Süre doldu → game over (gameStateRef ile stale closure'dan kaçın)
-  useEffect(() => {
-    if (timeLeft !== 0 || gameOver) return;
-    const finalState = gameStateRef.current;
-    setGameOver(true);
-    cancelAnimation(wheelRotation);
-    sounds.gameover();
-    saveHighScoreIfBetter(finalState.score).then((isNew) => {
-      onGameOver(finalState.score, isNew);
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft]);
-
-  // --- Animasyon stilleri ---
   const shakeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shakeX.value }],
   }));
 
-  // --- Yanlış vuruş titremesi ---
+  const targetShakeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: targetShakeY.value }],
+  }));
+
+  const activePinStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: pinY.value - PIN_Y_REST }],
+  }));
+
+  const rotatingPinsStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${targetRotation.value}deg` }],
+  }));
+
   function triggerShake() {
     shakeX.value = withSequence(
       withTiming(-9, { duration: 55 }),
-      withTiming( 8, { duration: 55 }),
+      withTiming(8, { duration: 55 }),
       withTiming(-5, { duration: 50 }),
-      withTiming( 5, { duration: 50 }),
+      withTiming(5, { duration: 50 }),
       withTiming(-2, { duration: 45 }),
-      withTiming( 0, { duration: 45 }),
+      withTiming(0, { duration: 45 }),
     );
   }
 
-  // --- Geri bildirim + efektler ---
-  const showFeedback = useCallback((type: 'correct' | 'wrong', countryName?: string) => {
-    setFeedback({ type, countryName });
-    setFlash(type);
+  function finishGame(finalScore: number) {
+    setGameOver(true);
+    cancelAnimation(targetRotation);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    sounds.gameover();
+    saveHighScoreIfBetter(finalScore).then((isNew) => {
+      onGameOver(finalScore, isNew);
+    });
+  }
 
-    if (type === 'correct') {
-      sounds.correct();
-    } else {
-      sounds.wrong();
-      triggerShake();
-    }
-
-    setTimeout(() => setFeedback({ type: null }), 1200);
-    setTimeout(() => setFlash(null), 500);
-  }, []);
-
-  // --- Level atlama ---
   function handleLevelUp(nextIdx: number) {
-    setIsLevelingUp(true);
-    sounds.correct(); // kısa sevinç sesi
-    // LevelUpBanner.onDone() çağrıldığında oyun devam eder (aşağıda)
-    setLevelIdx(nextIdx);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    sounds.correct();
+    if (levelLostLife.current) {
+      // Can yandı — banner gösterme, sessizce geç
+      pinY.value = height + 100;
+      pinY.value = withTiming(PIN_Y_REST, { duration: 280, easing: Easing.out(Easing.cubic) });
+      setPinLaunched(false);
+      setLevelIdx(nextIdx);
+    } else {
+      setIsLevelingUp(true);
+      setLevelIdx(nextIdx);
+    }
   }
 
   function handleLevelUpDone() {
+    // Yeni level için taze pin alttan gelir
+    pinY.value = height + 100;
+    pinY.value = withTiming(PIN_Y_REST, {
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+    });
     setIsLevelingUp(false);
-    setBallLaunched(false);
+    setPinLaunched(false);
   }
 
-  // --- Tap: topu fırlat ---
   const handleTap = useCallback(() => {
-    if (ballLaunched || gameOver || isLevelingUp) return;
+    if (pinLaunched || gameOver || isLevelingUp) return;
 
-    setBallLaunched(true);
+    const launchDuration = Math.max(40, 100 - levelIdx * 6);
+
+    setPinLaunched(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     sounds.launch();
 
-    // Topu yukarı fırlat
-    ballY.value = withTiming(BALL_Y_HIT, {
-      duration: LAUNCH_DURATION,
+    pinY.value = withTiming(PIN_Y_HIT, {
+      duration: launchDuration,
       easing: Easing.out(Easing.quad),
     });
 
-    // Çarpışma anında rotation'ı oku
     setTimeout(() => {
-      const currentRotation = rotationRef.current;
-      const hitIndex   = getHitSegment(currentRotation, segmentCount);
-      const hitCountry = wheelCountries[hitIndex];
-      const matched    = isMatch(hitCountry.code, ballCountry.code);
-      const newState   = updateScore(gameState, matched);
+      const currentLevel = levelRef.current;
+      const impactAngle = getImpactAngle(rotationRef.current);
+      const collided = willCollideWithPins(
+        impactAngle,
+        gameStateRef.current.placedPins,
+        currentLevel.collisionToleranceDeg,
+      );
+
+      if (collided) {
+        levelLostLife.current = true;
+        const newLives = gameStateRef.current.lives - 1;
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        sounds.wrong();
+        triggerShake();
+        setFlash('wrong');
+        setTimeout(() => setFlash(null), 350);
+        if (newLives <= 0) {
+          setTimeout(() => finishGame(gameStateRef.current.score), 520);
+        } else {
+          setGameState((prev) => ({ ...prev, lives: newLives }));
+          setTimeout(() => {
+            const lvl = levelRef.current;
+            setGameState((prev) => ({
+              ...prev,
+              placedPins: [...lvl.initialPins],
+              remainingPins: lvl.requiredPins,
+              streak: 0,
+            }));
+            pinY.value = height + 100;
+            pinY.value = withTiming(PIN_Y_REST, { duration: 230, easing: Easing.out(Easing.cubic) });
+            setPinLaunched(false);
+          }, 600);
+        }
+        return;
+      }
+
+      const newState = applySafeHit(gameStateRef.current, impactAngle);
       setGameState(newState);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      sounds.correct();
+      setFlash('correct');
+      setTimeout(() => setFlash(null), 350);
+      targetShakeY.value = withSequence(
+        withTiming(-4, { duration: 40 }),
+        withTiming(3,  { duration: 35 }),
+        withTiming(-2, { duration: 30 }),
+        withTiming(0,  { duration: 30 }),
+      );
 
-      showFeedback(matched ? 'correct' : 'wrong', hitCountry.name);
+      // Saplanmış pin hedefe geçti; aktif pini anlık ekran altına gizle
+      pinY.value = height + 100;
 
-      // Topu geri döndür
-      ballY.value = withTiming(BALL_Y_REST, {
-        duration: 300,
-        easing: Easing.in(Easing.quad),
-      });
-
-      setTimeout(() => {
-        // Oyun bitti mi?
-        if (newState.lives <= 0) {
-          setGameOver(true);
-          cancelAnimation(wheelRotation);
-          sounds.gameover();
-          // Yüksek skoru kaydet; sonuçla birlikte üst component'e bildir
-          saveHighScoreIfBetter(newState.score).then((isNew) => {
-            onGameOver(newState.score, isNew);
-          });
-          return;
-        }
-
-        // Level atlama kontrolü
-        const currentLevel = levelRef.current;
+      const totalRequired = currentLevel.initialPins.length + currentLevel.requiredPins;
+      if (isLevelComplete(newState.placedPins, totalRequired)) {
         const nextIdx = levelIdx + 1;
-        if (
-          currentLevel.scoreToAdvance !== null &&
-          newState.score >= currentLevel.scoreToAdvance &&
-          nextIdx < LEVELS.length
-        ) {
+        if (nextIdx < LEVELS.length) {
           handleLevelUp(nextIdx);
-          return;
+        } else {
+          finishGame(newState.score);
         }
+        return;
+      }
 
-        // Devam — yeni hedef bayrak üret
-        const next = nextBallTarget(wheelCountries, ballCountry.code);
-        setBallCountry(next);
-        setBallLaunched(false);
-      }, 350);
-    }, LAUNCH_DURATION);
-  }, [ballLaunched, gameOver, isLevelingUp, gameState, ballCountry, wheelCountries, segmentCount, levelIdx]);
+      // Yeni pin alttan kayarak yükselir; kullanıcı hemen tekrar dokunabilir
+      pinY.value = withTiming(PIN_Y_REST, {
+        duration: 230,
+        easing: Easing.out(Easing.cubic),
+      });
+      setPinLaunched(false);
+    }, launchDuration);
+  }, [gameOver, isLevelingUp, levelIdx, pinLaunched]);
 
   return (
     <View style={styles.root}>
-      {/* Shake animasyonu tüm oyun alanına uygulanır */}
+      <SpaceBackground />
       <Animated.View style={[styles.shakeWrapper, shakeStyle]}>
         <TouchableOpacity
-          style={styles.container}
           activeOpacity={1}
           onPress={handleTap}
+          style={styles.container}
         >
-          {/* HUD: Puan, Can, Seviye, Kombo */}
           <HUD
-            score={gameState.score}
             lives={gameState.lives}
-            combo={gameState.combo}
             level={level.id}
+            streak={gameState.streak}
           />
 
-          {/* Dönen çark — rotation SharedValue Wheel'e geçirilir */}
-          <Wheel
-            countries={wheelCountries}
-            rotation={wheelRotation}
-            radius={WHEEL_RADIUS}
-            style={styles.wheelContainer}
-          />
+          {/* Target + placed pins share shake wrapper so they move together */}
+          <Animated.View pointerEvents="none" style={[styles.targetGroup, targetShakeStyle]}>
+            <Target
+              rotation={targetRotation}
+              radius={TARGET_RADIUS}
+              remainingPins={gameState.remainingPins}
+            />
 
-          {/* Bayrak desenli top — ballY SharedValue Ball'a geçirilir */}
-          <Ball
-            country={ballCountry}
-            ballY={ballY}
-            restY={BALL_Y_REST}
-            style={styles.ball}
-          />
+            {/* Saplanmış pinler — hedefle birlikte döner */}
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.pinOrbit, { left: 0, top: 0 }, rotatingPinsStyle]}
+            >
+              {gameState.placedPins.map((angle, index) => (
+                <Pin
+                  key={`${angle}-${index}`}
+                  mode="placed"
+                  isObstacle={index < level.initialPins.length}
+                  style={pinPositionStyle(angle)}
+                />
+              ))}
+            </Animated.View>
+          </Animated.View>
 
-          {/* Geri bildirim mesajı — her zaman mount'lı */}
-          <View style={styles.feedbackWrapper} pointerEvents="none">
-            <FeedbackMessage result={feedback} />
-          </View>
+          {/* Aktif pin — tap ile yukarı fırlar */}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.activePin, activePinStyle]}
+          >
+            <Pin mode="active" />
+          </Animated.View>
 
-          {/* Countdown timer — sadece timeLimitSeconds olan levellar */}
-          {timeLeft !== null && (
-            <Text style={[styles.timer, timeLeft <= 10 && styles.timerUrgent]}>
-              {timeLeft}
-            </Text>
-          )}
-
-          {/* Dokunma ipucu */}
-          {!ballLaunched && !gameOver && !isLevelingUp && (
-            <Text style={styles.hint}>Ekrana dokun — fırlat!</Text>
+          {!pinLaunched && !gameOver && !isLevelingUp && (
+            <Text style={styles.hint}>{strings.tapToThrow}</Text>
           )}
         </TouchableOpacity>
       </Animated.View>
 
-      {/* Level atlama banner'ı — shake'in dışında, ortada */}
       <LevelUpBanner
         level={level.id}
-        visible={isLevelingUp}
         onDone={handleLevelUpDone}
+        visible={isLevelingUp}
       />
 
-      {/* Tam ekran renk flaşı */}
       <ScreenFlash flashType={flash} />
     </View>
   );
+}
+
+// Saplanmış pinin pinOrbit içindeki mutlak konumu.
+// isObstacle bilgisi Pin komponenti tarafından renk için ayrıca alınır.
+function pinPositionStyle(angle: number) {
+  const rad      = ((angle - 90) * Math.PI) / 180;
+  const distance = TARGET_RADIUS + 18;
+  const x        = TARGET_RADIUS + Math.cos(rad) * distance;
+  const y        = TARGET_RADIUS + Math.sin(rad) * distance;
+  return {
+    position: 'absolute' as const,
+    left:  x - PIN_W / 2,
+    top:   y - PIN_H / 2,
+    // +180: SVG'deki uç (y=0, üst) hedefe doğru döner
+    transform: [{ rotate: `${angle + 180}deg` }],
+  };
 }
 
 const styles = StyleSheet.create({
@@ -327,39 +367,54 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
-    flex: 1,
-    backgroundColor: '#0d0d1a',
     alignItems: 'center',
+    flex: 1,
   },
-  wheelContainer: {
+  target: {
+    left: TARGET_CX - TARGET_RADIUS,
     position: 'absolute',
-    top: WHEEL_CY - WHEEL_RADIUS,
-    left: WHEEL_CX - WHEEL_RADIUS,
+    top: TARGET_CY - TARGET_RADIUS,
   },
-  ball: {
+  targetGroup: {
+    left: TARGET_CX - TARGET_RADIUS,
     position: 'absolute',
-    top: BALL_Y_REST - 36,
-    left: width / 2 - 36,
+    top: TARGET_CY - TARGET_RADIUS,
+  },
+  pinOrbit: {
+    height: TARGET_RADIUS * 2,
+    left: TARGET_CX - TARGET_RADIUS,
+    position: 'absolute',
+    top: TARGET_CY - TARGET_RADIUS,
+    width: TARGET_RADIUS * 2,
+  },
+  placedPin: {
+    borderColor: 'rgba(0,0,0,0.35)',
+    borderRadius: 4,
+    borderWidth: 1,
+    height: 68,
+    position: 'absolute',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 3,
+    width: 5,
+  },
+  activePin: {
+    height: 90,
+    left: width / 2 - PIN_W / 2,
+    position: 'absolute',
+    top: PIN_Y_REST - 36,
+    width: PIN_W,
   },
   feedbackWrapper: {
+    alignSelf: 'center',
     position: 'absolute',
     top: height * 0.62,
-    alignSelf: 'center',
   },
   hint: {
-    position: 'absolute',
     bottom: 48,
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.48)',
     fontSize: 14,
-  },
-  timer: {
     position: 'absolute',
-    top: height * 0.55,
-    color: '#FFD700',
-    fontSize: 40,
-    fontWeight: 'bold',
-  },
-  timerUrgent: {
-    color: '#FF4444',
   },
 });

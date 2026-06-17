@@ -1,6 +1,8 @@
 # Flag Striker
 
-Bayrak ve ülke haritası eşleştirmeye dayalı Expo + React Native arcade oyunu.
+Tek dokunuşla oynanan, dönen hedefe bayrak temalı pin/ok saplama üzerine kurulu Expo + React Native arcade oyunu.
+
+Oyuncu ekrana dokunur, alttaki pin hedefe fırlar. Pin hedefe saplanır ve hedefle birlikte döner. Yeni pin mevcut pinlere çarparsa bölüm başarısız olur; gereken pin sayısı tamamlanınca level geçilir.
 
 ## Proje Kökü
 
@@ -23,15 +25,15 @@ npx tsc --noEmit
 
 ```text
 assets/
-  flags/        # Bayrak PNG dosyaları
-  maps/         # Ülke haritası PNG dosyaları
+  flags/        # Bayrak PNG dosyaları (skin/tema için)
+  maps/         # Harita PNG dosyaları (opsiyonel tema/rozet için)
   sounds/       # Ses efektleri
 src/
   components/   # Görsel UI component'leri
-  data/         # Ülke ve metin verileri
+  data/         # Level, tema ve metin verileri
   screens/      # Ekranlar
   theme/        # Renkler ve görsel tema
-  utils/        # Saf oyun mantığı ve yardımcılar
+  utils/        # Saf oyun mantığı, açı/çarpışma hesapları ve yardımcılar
 ```
 
 ## Proje Hafızası

@@ -1,61 +1,65 @@
-// Ses efekti yöneticisi — expo-av ile CC0 sesler
-// assets/sounds/ klasörüne eklenecek dosyalar:
-//   tap.mp3       — top dokunma
-//   launch.mp3    — fırlatma
-//   correct.mp3   — doğru eşleşme
-//   wrong.mp3     — yanlış eşleşme
-//   gameover.mp3  — oyun bitti
-// Dosya yoksa hata VERMEZ, sessizce devam eder.
-import { Audio } from 'expo-av';
+// Ses efekti yöneticisi — expo-audio tabanlı, lazy yükleme + önbellekleme
+// expo-audio SDK 56'nın resmi ses paketi (expo-av'ın halefi)
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import type { AudioPlayer } from 'expo-audio';
 
 type SoundName = 'tap' | 'launch' | 'correct' | 'wrong' | 'gameover';
 
-const soundFiles: Record<SoundName, ReturnType<typeof require> | null> = {
-  tap:      tryRequire('../../../assets/sounds/tap.mp3'),
-  launch:   tryRequire('../../../assets/sounds/launch.mp3'),
-  correct:  tryRequire('../../../assets/sounds/correct.mp3'),
-  wrong:    tryRequire('../../../assets/sounds/wrong.mp3'),
-  gameover: tryRequire('../../../assets/sounds/gameover.mp3'),
+// Metro bundler statik analiz için require'lar build-time çözülmeli
+const SOUND_SOURCES: Record<SoundName, number> = {
+  tap:      require('../../assets/sounds/tap.mp3'),
+  launch:   require('../../assets/sounds/launch.mp3'),
+  correct:  require('../../assets/sounds/correct.mp3'),
+  wrong:    require('../../assets/sounds/wrong.mp3'),
+  gameover: require('../../assets/sounds/gameover.mp3'),
 };
 
-// require() derleme zamanında değerlendirilir; dosya yoksa hata atar.
-// Çalışma ortamında null döner — try/catch ile yakalanır.
-function tryRequire(path: string) {
+const VOLUMES: Record<SoundName, number> = {
+  tap:      0.6,
+  launch:   0.7,
+  correct:  1.0,
+  wrong:    0.85,
+  gameover: 1.0,
+};
+
+// Önbellek — her ses için tek player instance
+const cache: Partial<Record<SoundName, AudioPlayer>> = {};
+
+let modeSet = false;
+async function ensureAudioMode() {
+  if (modeSet) return;
+  modeSet = true;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require(path);
+    await setAudioModeAsync({ playsInSilentMode: true });
   } catch {
-    return null;
+    // cihaz desteklemiyorsa sessizce geç
   }
 }
 
-// Yüklenmiş ses nesneleri önbelleği
-const cache: Partial<Record<SoundName, Audio.Sound>> = {};
-
-async function play(name: SoundName, volume = 1.0): Promise<void> {
-  const file = soundFiles[name];
-  if (!file) return; // asset henüz yok — sessiz devam
-
+async function play(name: SoundName): Promise<void> {
   try {
-    // Önbellekte varsa tekrar kullan
-    let sound = cache[name];
-    if (!sound) {
-      const { sound: s } = await Audio.Sound.createAsync(file, { volume });
-      cache[name] = s;
-      sound = s;
+    await ensureAudioMode();
+
+    if (!cache[name]) {
+      const player = createAudioPlayer(SOUND_SOURCES[name]);
+      player.volume = VOLUMES[name];
+      cache[name] = player;
     }
-    await sound.setPositionAsync(0);
-    await sound.setVolumeAsync(volume);
-    await sound.playAsync();
+
+    const player = cache[name]!;
+    // Başa sar ve çal
+    await player.seekTo(0);
+    player.volume = VOLUMES[name];
+    player.play();
   } catch {
-    // Ses çalarken hata — oyunu engelleme
+    // ses çalamazsa oyunu kesme
   }
 }
 
 export const sounds = {
-  tap:      () => play('tap',      0.6),
-  launch:   () => play('launch',   0.7),
-  correct:  () => play('correct',  1.0),
-  wrong:    () => play('wrong',    0.85),
-  gameover: () => play('gameover', 1.0),
+  tap:      () => play('tap'),
+  launch:   () => play('launch'),
+  correct:  () => play('correct'),
+  wrong:    () => play('wrong'),
+  gameover: () => play('gameover'),
 };

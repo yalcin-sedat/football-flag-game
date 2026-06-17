@@ -4,6 +4,7 @@
 import 'react-native-gesture-handler';
 import React, { useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import HomeScreen    from './src/screens/HomeScreen';
 import GameScreen    from './src/screens/GameScreen';
@@ -23,6 +24,7 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
       <StatusBar style="light" />
 
       {screen === 'home' && (
@@ -41,6 +43,7 @@ export default function App() {
           onHome={handleHome}
         />
       )}
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

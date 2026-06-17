@@ -2,117 +2,186 @@
 
 ## Genel Yaklaşım
 
-- **Aşama 1:** Tüm oyun mantığı `App.tsx` içinde, temiz ve yorumlu.
-- **Aşama 2+:** Aşağıdaki klasör yapısına kademeli geç.
+Flag Striker artık tek dokunuşlu **dönen hedefe pin saplama** arcade oyunudur. Mimari, hedef rotasyonu, pin açıları, çarpışma toleransı ve level ilerlemesi etrafında kurulmalıdır.
+
 - Tek yönlü veri akışı: state ekran component'inde, prop ile iner, olaylar callback ile çıkar.
+- Oyun mantığı saf fonksiyonlarda tutulur; animasyon ve render component'lerde kalır.
+- Eski bayrak-harita eşleştirme kodu aşamalı olarak pin/çarpışma mantığıyla değiştirilecek.
 
-## Hedef Klasör Yapısı (Aşama 2+)
+## Hedef Klasör Yapısı
 
-```
+```text
 App.tsx                      # Navigasyon / ekran yönlendirme
 assets/
-  flags/                     # Bayrak PNG'leri — ISO kodlu (tr.png, de.png, mx.png...)
-  maps/                      # Harita PNG silüetleri — ISO kodlu (tr.png, de.png...)
+  flags/                     # Skin/tema için bayrak PNG'leri
+  maps/                      # Opsiyonel hedef rozeti/tema için harita PNG'leri
   sounds/                    # Ses efektleri (CC0)
+  backgrounds/               # Opsiyonel atmosfer görselleri
 src/
   data/
-    countries.ts             # Ülke verisi: kod, ad, renk, flag/map referansı
-    levels.ts                # Seviye/grup tanımları
-    strings.ts               # TÜM Türkçe UI metinleri (object)
+    countries.ts             # Tema/skin verisi için ülke renkleri ve kodları
+    levels.ts                # Pin saplama level tanımları
+    strings.ts               # Tüm Türkçe UI metinleri
   components/
-    Wheel.tsx                # Dönen çark (SVG dilimler + harita PNG'leri)
-    Ball.tsx                 # Bayrak desenli top + fırlatma animasyonu
-    HUD.tsx                  # Puan, can, seviye göstergesi
-    FeedbackMessage.tsx      # "Mükemmel İsabet! Bu bayrak X'e ait" / "Yanlış Bayrak!"
+    icons/                   # react-native-svg ikonları
+    Target.tsx               # Yeni dönen hedef diski (ileride Wheel yerine geçebilir)
+    Wheel.tsx                # Mevcut dönen çark; pivot sırasında Target rolüne evrilecek
+    Pin.tsx                  # Tek pin/ok render'ı
+    Ball.tsx                 # Eski top component'i; pivot sonrası kaldırılabilir veya skin'e dönüşebilir
+    HUD.tsx                  # Level, kalan pin, skor/streak
+    FeedbackMessage.tsx      # Fail / başarı mesajları
+    ScreenFlash.tsx          # Kısa ekran flaşları
+    LevelUpBanner.tsx        # Level complete geçişi
   screens/
     HomeScreen.tsx
-    GameScreen.tsx           # Çekirdek oyun mantığı
+    GameScreen.tsx           # Çekirdek oyun state'i ve animasyon orkestrasyonu
     GameOverScreen.tsx
     LeaderboardScreen.tsx
     SettingsScreen.tsx
   utils/
-    gameLogic.ts             # Çarpışma/açı/eşleştirme — saf fonksiyonlar
-    storage.ts               # Local storage
+    gameLogic.ts             # Açı, pin çarpışması, level tamamlanma — saf fonksiyonlar
+    storage.ts               # Local progress/high score
   theme/
-    colors.ts                # Neon paleti
+    colors.ts
 ```
 
-## Veri Modeli (`countries.ts`)
+## Yeni Level Veri Modeli (`levels.ts`)
 
 ```ts
-export type Country = {
-  code: string;        // ISO 3166-1 alpha-2 (örn. "tr") — hem flag hem map dosya adı
-  name: string;        // Türkçe ad (örn. "Türkiye")
-  color: string;       // Sembol/tema rengi (harita tint + dilim arka planı)
+export type RotationDirection = 'clockwise' | 'counterClockwise';
+export type SpeedPattern = 'constant' | 'accelerating' | 'stopAndGo' | 'switchDirection';
+
+export type LevelConfig = {
+  id: number;
+  requiredPins: number;
+  rotationDuration: number;
+  direction: RotationDirection;
+  collisionToleranceDeg: number;
+  initialPins: number[];
+  speedPattern: SpeedPattern;
 };
 ```
 
-- Bayrak görseli: `assets/flags/${code}.png`
-- Harita görseli: `assets/maps/${code}.png` (siyah silüet → `tintColor: color` ile renklendirilir)
-- Aynı ISO kodu hem bayrak hem haritayı bulur → tek kaynak, temiz.
+- `requiredPins`: level bitirmek için saplanacak pin sayısı.
+- `rotationDuration`: tam dönüş süresi; küçük değer daha hızlı oyun demektir.
+- `collisionToleranceDeg`: yeni pinin mevcut pine ne kadar yaklaşınca çarpışacağı.
+- `initialPins`: level başında hedefte hazır duran engel pin açıları.
+- `speedPattern`: ileride hız/yön davranışını belirler.
 
-## Asset Kuralları
+## Oyun State Modeli
 
-- **Bayraklar:** PNG, Flagpedia/FamFamFam, ISO kodlu, atıfsız/serbest.
-- **Haritalar:** PNG, mapsicon (GitHub), ISO kodlu, siyah silüet. Renklendirme kodda `tintColor` ile yapılır — her ülke için ayrı renkli dosya GEREKMEZ.
-- React Native'de PNG → `<Image source={require(...)} />`; SVG → `react-native-svg`.
-- Dinamik `require` sınırlı olduğu için asset'ler bir map objesinde toplanır (örn. `flagImages[code]`).
+```ts
+type GameState = {
+  score: number;
+  streak: number;
+  currentLevelId: number;
+  placedPins: number[];
+  remainingPins: number;
+  status: 'playing' | 'launching' | 'levelComplete' | 'failed';
+};
+```
+
+- `placedPins`, hedefin lokal açılarında tutulur.
+- Hedef döndükçe pinler görsel olarak hedefle birlikte döner.
+- Yeni pinin hedefe saplandığı lokal açı, anlık rotation'dan hesaplanır.
+
+## `gameLogic.ts` Saf Fonksiyonları
+
+Yeni çekirdek için hedef fonksiyonlar:
+
+```ts
+normalizeAngle(angle: number): number
+getImpactAngle(rotation: number): number
+angleDistance(a: number, b: number): number
+willCollideWithPins(impactAngle: number, placedPins: number[], toleranceDeg: number): boolean
+addPin(placedPins: number[], impactAngle: number): number[]
+isLevelComplete(placedPins: number[], requiredPins: number): boolean
+```
+
+Geçiş döneminde eski fonksiyonlar durabilir, fakat yeni oyun kodu bunlara taşınmalıdır:
+
+- Eski: `getHitSegment`, `isMatch`, `nextBallTarget`, `updateScore`
+- Yeni: pin açısı, çarpışma, level completion
 
 ## Component Görevleri
 
-### `Wheel.tsx`
-- SVG ile N dilimli daire çizer (dilim arka planı = ülke rengi).
-- Her dilimin ortasına o ülkenin harita PNG'si (tint'li) yerleştirilir.
-- Reanimated `useSharedValue(rotation)` ile döner; hız/yön prop'tan.
-- Anlık rotation değerini collision için dışarı verir.
+### `Target.tsx` / `Wheel.tsx`
 
-### `Ball.tsx`
-- Alt orta sabit konum; üzerinde hedef ülkenin bayrak PNG'si.
-- `launch()` → yukarı fırlar, çarpışma Y'sine ulaşınca callback, sonra geri döner.
-- Yeni hedefte bayrak görseli değişir.
+- Merkezde dönen hedefi çizer.
+- Reanimated `rotation` shared value ile döner.
+- Üzerinde saplanmış pinleri, hedef lokal açılarına göre render eder.
+- Hedef okunabilir, sade ve yüksek kontrastlı olmalıdır.
+
+### `Pin.tsx`
+
+- Tek pin/ok görselini çizer.
+- İki kullanım modu:
+  - fırlatılacak aktif pin
+  - hedefe saplanmış pin
+- Bayrak renkleri veya küçük bayrak şeridi skin olarak kullanılabilir.
 
 ### `HUD.tsx`
-- Puan (sol üst), Can/kalpler (sağ üst), Seviye+Grup+progress (orta üst).
-- Puan scale, can azalınca kalp shake.
+
+- Level.
+- Kalan pin sayısı.
+- Skor veya streak.
+- Gereksiz kalp/can kalabalığı MVP'de kullanılmayabilir.
 
 ### `FeedbackMessage.tsx`
-- Doğru: "Mükemmel İsabet! Bu bayrak {ülke}'ye ait." + glow.
-- Yanlış: "Yanlış Bayrak!" + kırmızı flash.
-- Kısa süre görünür, fade-out ile kaybolur. Oyunu DURDURMAZ.
 
-### `gameLogic.ts` (saf fonksiyonlar)
-- `getHitSegment(rotation, segmentCount)` → vurulan dilim index'i.
-- `isMatch(hitCountryCode, ballCountryCode)` → boolean.
-- `nextBallTarget(countries, current)` → yeni hedef ülke.
-- `updateScore(state, isMatch)` → yeni skor/combo/can.
+- Başarı: kısa "Level Tamamlandı" / "Harika!" mesajı.
+- Fail: "Çarpışma!" / "Tekrar dene" mesajı.
+- Mesaj oyunu yavaşlatmamalı.
 
-## Veri Akışı (Oyun Ekranı)
+### `ScreenFlash.tsx`
 
+- Fail için kırmızı flash.
+- Level complete için altın/cyan flash.
+
+## Veri Akışı
+
+```text
+GameScreen
+  state: level, placedPins, remainingPins, score, streak, status
+  shared: targetRotation, activePinY, shakeX
+
+tap
+  → active pin launch animation
+  → impact moment reads targetRotation
+  → gameLogic.getImpactAngle(rotation)
+  → gameLogic.willCollideWithPins(...)
+    → collide: status = failed, flash/shake/sound
+    → safe: addPin, remainingPins--, hit feedback
+       → if complete: levelComplete
+       → else: next pin ready
 ```
-GameScreen (state: score, lives, ballCountry, wheelCountries, level, rotation)
-   ├── HUD (score, lives, level)
-   ├── Wheel (wheelCountries, speed; out: rotation)
-   ├── Ball (ballCountry, onLaunchComplete)
-   └── FeedbackMessage (lastResult)
 
-tap → Ball.launch() → onLaunchComplete
-   → gameLogic.getHitSegment(rotation) → vurulan ülke
-   → isMatch(vurulanÜlke, ballCountry)
-   → updateScore → setState → FeedbackMessage göster → nextBallTarget
-```
-
-## State Yönetimi
-- Aşama 1-2: useState/useReducer.
-- Çark rotation: Reanimated useSharedValue (JS'e okunabilir kopya → collision).
-- Kalıcı: storage.ts (AsyncStorage).
-- Zustand sadece çok ekranlı karmaşıklık olursa (Aşama 3+).
-
-## Animasyon Sorumlulukları (Reanimated)
+## Animasyon Sorumlulukları
 
 | Animasyon | Nerede |
 |---|---|
-| Çark dönüşü | Wheel |
-| Top fırlatma + geri dönüş | Ball |
-| Doğru glow / yanlış flash | FeedbackMessage / GameScreen |
-| Ekran shake (yanlış) | GameScreen |
-| Skor scale / kalp shake | HUD |
+| Hedef dönüşü | GameScreen shared value + Target/Wheel render |
+| Aktif pin fırlatma | GameScreen veya Pin |
+| Saplanmış pinlerin hedefle dönmesi | Target/Wheel |
+| Çarpışma shake | GameScreen |
+| Fail / success flash | ScreenFlash |
+| Level complete banner | LevelUpBanner |
+
+## Asset Kuralları
+
+- UI ikonları kod + `react-native-svg` ile çizilir.
+- Bayrak PNG'leri ana mekanik için zorunlu değildir; pin skinleri ve tema paketleri için kullanılabilir.
+- Harita PNG'leri ana mekanik için zorunlu değildir; hedef rozeti/tema olarak kullanılabilir.
+- Ses efektleri CC0 veya ticari kullanıma uygun olmalıdır.
+- Referans oyunlardan ikon, hedef şekli, isim veya mağaza görseli kopyalanmaz.
+
+## State ve Kalıcılık
+
+- Aşama 1-3: `useState`, `useRef`, Reanimated shared value.
+- Local storage:
+  - highestLevel
+  - bestStreak
+  - totalPins
+  - soundEnabled
+  - hapticsEnabled
+- Supabase sadece leaderboard aşamasında eklenir.

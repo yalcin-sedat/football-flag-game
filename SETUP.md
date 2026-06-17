@@ -3,6 +3,10 @@
 > Adımları sırayla uygula. Reanimated 4 kurulumu kritik — atlanırsa
 > "Exception in HostFunction" hatası alınır.
 
+> Not: Projenin yeni yönü bayrak-harita eşleştirme değil, dönen hedefe pin/ok
+> saplama arcade oyunudur. Bayrak ve harita asset'leri ana mekanik için şart
+> değil; skin, tema ve görsel kimlik için kullanılabilir.
+
 ## 1. Proje Oluştur
 
 ```bash
@@ -64,12 +68,12 @@ export default function App() {
 
 ## 5. Görsel Asset'leri İndir
 
-### Bayraklar (PNG, ISO kodlu)
+### Bayraklar (PNG, ISO kodlu, opsiyonel skin/tema)
 - **Flagpedia:** https://flagpedia.net/download/icons — tüm ülkeler tek paket.
 - veya **FamFamFam Flag Icons** — atıfsız, serbest, ISO kodlu (tr.png, de.png...).
 - İndir → `assets/flags/` klasörüne koy.
 
-### Haritalar (PNG silüet, ISO kodlu)
+### Haritalar (PNG silüet, ISO kodlu, opsiyonel hedef rozeti/tema)
 - **mapsicon (GitHub):** https://github.com/djaiss/mapsicon
 - Siyah silüet, ISO kodlu, hafif (~12 KB). İstediğin boyutu seç.
 - İndir → `assets/maps/` klasörüne koy.

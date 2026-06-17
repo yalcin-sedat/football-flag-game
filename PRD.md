@@ -2,89 +2,164 @@
 
 ## 1. Vizyon
 
-Hızlı, akıcı, bağımlılık yapan bir arcade oyun + doğal bayrak/coğrafya öğrenme. Kullanıcı birkaç saniyede anlar, tekrar tekrar oynar ve oynarken bayrakları/ülkeleri öğrenir. Hedef his: "Bir kez daha", "Skorumu geçeceğim", "Bu bayrak hangi ülkeydi?".
+**Flag Striker**, Twisty Arrow / Knife Hit ailesinden ilham alan, tek dokunuşla oynanan bir mobil arcade zamanlama oyunudur. Oyuncu, dönen bir hedefe bayrak temalı pin/ok saplar; amaç, mevcut pinlere çarpmadan bölümün istediği sayıda isabet yapmaktır.
+
+Hedef his: **"Bir kez daha"**, **"Bu sefer geçeceğim"**, **"Çok yakındı"**. Oyun öğretici bir bayrak-harita quiz'i olmaktan çıkar; bayrak ve dünya teması artık ayırt edici görsel kimlik ve koleksiyon katmanıdır.
+
+## 1.1 Ürün Yönü
+
+- Referans alınan ana ürün dersi: tek input, kısa seans, anında fail, sıfıra yakın restart süresi.
+- Birebir klon yapılmaz; isim, görsel kimlik, hedef şekli, pin tasarımı, level kurgusu ve meta katman bize özgü olur.
+- Marka yönü: **Flag Striker**. Dünya, bayrak, arena ve pin/ok estetiği birleşir.
+- Eski "bayrak topu + ülke haritası eşleştirme" mekanizması ana oyun olmaktan çıkar.
+- Öğrenme hedefi ikincil hale gelir; öncelik akıcı arcade hissi, okunabilirlik ve tekrar oynanabilirliktir.
 
 ## 2. Çekirdek Oynanış
 
-- Ekranın ortasında dönen çark; dilimlerde **ülke haritaları** (silüet + ülke sembol rengi).
-- Altta sabit fırlatıcı; **topun üzerinde bir ülkenin bayrak deseni** var (hedef budur).
-- Çark döner; oyuncu, topun bayrağı çarktaki **aynı ülkenin haritasına** hizalandığı anda ekrana dokunup topu fırlatır.
-- **Doğru eşleşme:** "Mükemmel İsabet! Bu bayrak Meksika'ya ait." mesajı hızlıca belirir, kısa glow/parıltı, sonra kaybolur. **Oyun durmaz.** Puan +1.
-- **Yanlış eşleşme:** "Yanlış Bayrak!" kısa uyarı, kırmızı flash + hafif shake, can -1. Oyun yeni hedefle devam.
-- Her atıştan sonra topun bayrağı değişir (yeni hedef).
+- Ekranın ortasında dönen bir hedef bulunur.
+- Oyuncu ekrana dokununca alttan bir pin/ok hedefe doğru fırlar.
+- Pin hedefe saplanır ve hedefle birlikte dönmeye devam eder.
+- Yeni pin, daha önce saplanmış pinlerden birine çarparsa bölüm başarısız olur.
+- Bölüm, gereken pin sayısı başarıyla saplanınca tamamlanır.
+- Her bölüm birkaç saniye ile bir dakika arasında bitebilir.
+- Restart süresi çok kısa olmalıdır; başarısızlık oyuncuyu oyundan koparmamalıdır.
 
-## 3. Öğrenme Mekanizması
+## 3. Temel Kurallar
 
-Öğrenme oyunun AKIŞI İÇİNDE olur, ayrı ekranda değil:
-- Her doğru eşleşmede bayrak → ülke adı eşleşmesi kısa görsel geri bildirimle pekişir.
-- Mesaj hızlı geçer, oyunu yavaşlatmaz.
-- Tekrar oynadıkça (spaced repetition) bayrak-ülke-harita üçlüsü öğrenilir.
-- Opsiyonel: level sonunda o bölümde geçen bayrak-ülke eşleşmeleri özet kartı.
+1. Oyuncu yalnızca dokunur; yön, güç veya sürükleme yoktur.
+2. Hedef sürekli döner; hız ve yön level'a göre değişir.
+3. Saplanmış pinlerin açıları tutulur.
+4. Yeni atışın saplanacağı açı, mevcut pin açılarına çok yakınsa çarpışma sayılır.
+5. Çarpışma olursa fail veya can kaybı olur. MVP için önerilen kural: tek çarpışma = bölüm başarısız.
+6. Gerekli pin sayısına ulaşılırsa level geçilir.
 
-## 4. Ekranlar
+## 4. Görsel Tasarım Yönü
+
+- Minimal, yüksek kontrastlı, premium arcade.
+- Hedef: merkezde güçlü, net okunan bir dünya/rozet/arena diski.
+- Pinler: bayrak renkli, ince ama okunaklı; uç kısmı hedefe saplanmış hissi vermeli.
+- Arka plan: sade koyu zemin; gerekiyorsa çok hafif arena/stadyum atmosferi.
+- Vurgu renkleri: cyan, kırmızı/turuncu fail, altın level complete, kontrollü bayrak renkleri.
+- UI kalabalık olmamalı; oyuncunun gözü hedef, pinler ve kalan pin sayısında kalmalı.
+- Raster görseller atmosfer için kullanılabilir; oyun objeleri ve UI mümkün olduğunca kod/SVG ile çizilir.
+
+## 5. Ekranlar
 
 ### Ana Menü
-- Logo "Flag Striker", butonlar: Oyna, Günlük Görev, Sıralama, Karakterler (top/çark temaları), Ayarlar.
-- Koyu mavi neon stadyum atmosferi, projektör ışıkları, saha çizgileri (SVG).
-- Premium arcade his, neon mavi/yeşil/mor/altın, smooth geçişler.
+
+- Logo: **Flag Striker**.
+- Ana aksiyon: Oyna.
+- İkincil aksiyonlar: Günlük Görev, Sıralama, Pinler/Temalar, Ayarlar.
+- Üst alan: oyuncu seviyesi, coin/gem veya ilerleme bilgisi.
+- Menü, pazarlama sayfası değil; oyuncuyu hızlıca oyuna sokan sade bir merkez ekran olmalı.
 
 ### Oyun Ekranı
-- Sol üst: Puan. Sağ üst: Can (kalpler). Orta üst: Seviye + Grup + progress bar.
-- Orta: dönen çark (Seviye 1 = 4 harita dilimi).
-- Alt: sabit fırlatıcı + üzerinde bayrak desenli top.
-- Doğru/yanlış geri bildirim mesajları (akışı durdurmaz).
+
+- Üst: level, kalan pin sayısı, streak/score.
+- Orta: dönen hedef + saplanmış pinler.
+- Alt: sıradaki pin/ok ve tek dokunma alanı.
+- Fail ve başarı efektleri kısa, net, akışı bozmayan şekilde gösterilir.
+
+### Level Complete
+
+- Kısa kutlama animasyonu.
+- Sonraki levele otomatik veya tek dokunuşla geçiş.
+- Yıldız sistemi opsiyonel: hatasız, hızlı bitirme, streak.
 
 ### Game Over
-- Final skor, doğruluk oranı, combo. Butonlar: Tekrar Oyna, Ana Menü, Skoru Gönder.
+
+- Level, skor/streak, "Tekrar Oyna", "Ana Menü".
+- Ödüllü reklam ile ikinci şans ileride eklenebilir; MVP'de şart değil.
 
 ### Sıralama
-- Top 10, kendi sıran, rozetler, günlük/haftalık/tüm zamanlar.
 
-## 5. Çarpışma + Eşleştirme Mantığı
+- Top level, streak, toplam isabet gibi sade filtreler.
+- Global leaderboard Aşama 3+.
 
-1. Top belirli Y koordinatına ulaşınca çarpışma sayılır.
-2. Çarkın o anki rotation değeri normalize edilir (0–360).
-3. Tepe (0°) referans; 360 / dilim sayısı → vurulan dilim index'i.
-4. Vurulan dilimin ülkesi, topun bayrağının ülkesiyle karşılaştırılır.
-5. Eşit → doğru; değil → yanlış.
+### Market / Koleksiyon
 
-## 6. Seviye Sistemi
+- Pin/ok skinleri.
+- Hedef temaları.
+- Arka plan/arena temaları.
+- Bayrak paketleri veya renk setleri.
 
-- **Seviye 1 / Grup A:** 4 dilim, yavaş çark, tanınır büyük ülkeler (örn. Meksika, Brezilya, Fransa, Türkiye).
-- **Seviye 2 / Grup B:** biraz hızlı, combo başlar.
-- **Seviye 3 / Grup C:** çark yön değiştirir, dar dilimler.
-- **Seviye 4 / Challenge:** 5-6 dilim, hızlı, süre limiti.
-- Tanınması zor küçük/karmaşık haritalı ülkeler ileri seviyelere.
-- Grup tamamlanınca yeni arena açılır.
+## 6. Level Sistemi
 
-## 7. Skor / Combo / Ödül
+Level zorluğu şu parametrelerle artar:
 
-- Başlangıç: Puan 0, Can 3.
-- Doğru: +1. 3 combo: +2 bonus. 5 combo: çark glow. 10 combo: "Yanıyorsun!".
-- Yanlış: -1 can, combo sıfırlanır.
-- Level sonu yıldız: 1 (tamamladı), 2 (≤1 hata), 3 (hatasız).
+- `requiredPins`: saplanması gereken pin sayısı.
+- `rotationDuration`: tam turun süresi; küçüldükçe hız artar.
+- `direction`: saat yönü, ters yön veya level içinde yön değişimi.
+- `collisionToleranceDeg`: pinler arası minimum güvenli açı.
+- `initialPins`: level başında hedefte hazır bulunan engel pinleri.
+- `speedPattern`: sabit, hızlanan, yavaşlayan, dur-kalk, yön değiştiren.
 
-## 8. Günlük Görev
-Her gün tek özel bölüm (örn. "10 doğru", "sadece 3 can", "çark yön değiştirir"). Günlük skor ayrı sıralamaya.
+MVP hedefi:
 
-## 9. Karakter / Tema
-İsim/oyuncu YOK. Bunun yerine top/çark temaları (skin): farklı top desenleri, çark stilleri, arka plan temaları. Hepsi serbest/kurgusal.
+- 30-50 kısa level.
+- İlk 5 level öğretici ama tutorial'sız.
+- 10. level civarı ilk hazır engel pinleri.
+- 20. level civarı yön değişimi.
+- 30+ level'da dar tolerans ve hız varyasyonu.
+
+## 7. Skor / Streak / İlerleme
+
+- Her başarılı pin: +1 skor veya level içi progress.
+- Level tamamlanınca bonus: kalan süre, hatasızlık veya streak.
+- Streak, fail olunca sıfırlanır.
+- Oyuncunun en yüksek level'ı ve en iyi streak'i local storage'da saklanır.
+- Progress kaybı kritik risk olarak görülür; kayıt sistemi basit ama sağlam olmalıdır.
+
+## 8. Geri Bildirim ve His
+
+- Atışta hafif haptic + kısa fırlatma sesi.
+- Başarılı saplanmada küçük hit spark, hedefte mikro titreşim, tatmin edici SFX.
+- Çarpışmada kırmızı flash, ekran shake, kısa fail sesi.
+- Level tamamlanınca altın/cyan kutlama.
+- Restart bir saniyeden kısa hissettirmeli.
+
+## 9. Ses
+
+- Fırlatma, saplanma, çarpışma, level complete, game over.
+- Kısa, keskin, arcade odaklı sesler.
+- Arka plan müziği varsa telefonun kendi müziğiyle çakışmamalı; ayarlardan kapatılabilir olmalı.
 
 ## 10. Kullanıcı / Backend
-- İlk prototip: kullanıcı adı + skor local storage.
-- Sonra: Supabase leaderboard. İleride Google/Apple login.
 
-## 11. Ses
-tap, fırlatma, doğru, yanlış, level complete, game over. Ayarlardan aç/kapa. Telifsiz/CC0.
+- MVP: local progress, high score, best streak, sound setting.
+- Sonra: Supabase leaderboard.
+- Daha sonra: Apple/Google login veya anonim kullanıcı adı.
 
-## 12. Para Kazanma
-Ücretsiz + AdMob. Geçişli (Game Over / her 3 oyun), ödüllü ("izle, can kazan" / "devam et"). İleride reklamsız sürüm + premium tema. Gizlilik Politikası zorunlu.
+## 11. Para Kazanma
 
-## 13. Yayınlama
-EAS Build + Apple (99$/yıl) + Google (25$) + ikon + splash + store görselleri + gizlilik politikası.
+- Ücretsiz + AdMob.
+- Reklam frekansı oyunun ritmini bozmamalı.
+- İlk seanslarda agresif interstitial yok.
+- Interstitial için öneri: birkaç fail veya birkaç level sonrası.
+- Rewarded ad: ikinci şans, streak koruma, ekstra coin gibi açık değer sunmalı.
+- Tek ve anlaşılır IAP: reklamsız sürüm.
 
-## 14. Telif Durumu
-Bu tasarımda gerçek kişi/marka YOK → risk sıfır. Sadece bayrak (kamuya açık) + harita (CC0) + ülke adı (faktüel). Asset lisansları indirilirken doğrulanır.
+## 12. Yayınlama
 
-## 15. Başarı Kriteri
-Akıcı, tekrar oynatan, görsel olarak premium, dil bağımsız (metin minimum → uluslararası), öğretici bir arcade oyun.
+- EAS Build.
+- App icon + splash yeni mekanik ile uyumlu olmalı: dönen hedef + bayrak pin.
+- Store görselleri oyunun gerçek oynanışını göstermeli.
+- Gizlilik politikası zorunlu.
+- Store metni "tek dokunuş timing arcade" değerini öne çıkarmalı.
+
+## 13. Telif ve Klon Riski
+
+- Twisty Arrow, Knife Hit, aa gibi oyunların birebir kopyası yapılmaz.
+- Mekanik türünden ilham alınır; marka, ekran kompozisyonu, level tasarımı, ikon, hedef/pin görselleri özgün tutulur.
+- "Twisty Arrow" adı, ikon biçimi, mağaza açıklaması veya görsel düzeni taklit edilmez.
+- Gerçek futbolcu, kulüp, turnuva, lisanslı logo kullanılmaz.
+- Bayrak kullanımı ve asset lisansları ayrıca doğrulanır.
+
+## 14. Başarı Kriteri
+
+- Oyuncu 3 saniyede ne yapacağını anlar.
+- Fail sonrası tekrar deneme çok hızlıdır.
+- İlk 10 level akıcı ve adil hissettirir.
+- Oyuncu "yakındı" hissiyle tekrar dener.
+- Progress güvenilir saklanır.
+- Reklam şikayeti tasarımın merkez problemi haline gelmez.

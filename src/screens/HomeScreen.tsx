@@ -1,286 +1,579 @@
-// Ana menü ekranı — neon arcade stadyum atmosferi
-import React, { useEffect } from 'react';
+import React, { ReactNode, useEffect } from 'react';
 import {
-  Dimensions,
+  Alert,
+  ImageBackground,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
-  useSharedValue,
+  Easing,
   useAnimatedStyle,
+  useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
   withTiming,
-  Easing,
 } from 'react-native-reanimated';
-import { Svg, Line, Circle, Ellipse, Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
-import { colors } from '../theme/colors';
+import {
+  BallBadgeIcon,
+  BallCollectionIcon,
+  CalendarIcon,
+  ChevronIcon,
+  CoinIcon,
+  FlagRibbonIcon,
+  GemIcon,
+  GlobeIcon,
+  PlayIcon,
+  SettingsIcon,
+  TrophyIcon,
+} from '../components/icons/GameIcons';
 import { strings } from '../data/strings';
 
-const { width, height } = Dimensions.get('window');
+const homeBackground = require('../../assets/backgrounds/home-background-world.png');
 
 type HomeScreenProps = {
   onPlay: () => void;
 };
 
-// Menü buton yapılandırması
-const MENU_ITEMS = [
-  { key: 'play',      label: () => strings.oyna,        primary: true },
-  { key: 'daily',     label: () => strings.gunlukGorev, primary: false },
-  { key: 'leaderboard', label: () => strings.siralama,  primary: false },
-  { key: 'settings',  label: () => strings.ayarlar,     primary: false },
+type LockedMenuKey = 'daily' | 'leaderboard' | 'collection' | 'settings';
+
+const LOCKED_MENU_MESSAGES: Record<LockedMenuKey, string> = {
+  collection: strings.karakterler,
+  daily: strings.gunlukGorev,
+  leaderboard: strings.siralama,
+  settings: strings.ayarlar,
+};
+
+const menuItems: Array<{
+  icon: ReactNode;
+  key: LockedMenuKey;
+  label: string;
+}> = [
+  { icon: <CalendarIcon />, key: 'daily', label: strings.gunlukGorev.toUpperCase() },
+  { icon: <TrophyIcon />, key: 'leaderboard', label: strings.siralama.toUpperCase() },
+  { icon: <BallCollectionIcon />, key: 'collection', label: strings.toplar },
 ];
 
 export default function HomeScreen({ onPlay }: HomeScreenProps) {
-  // Logo nefes alma (pulse) animasyonu
-  const logoGlow = useSharedValue(0.6);
-  // Küçük hareketli nokta / parıltı efekti için
-  const sparkleOpacity = useSharedValue(0);
+  const { height, width } = useWindowDimensions();
+  const compact = height < 760;
+  const shellWidth = Math.min(width - 32, 380);
+  const titleScale = Math.min(Math.max(width / 390, 0.9), 1.08);
+  const menuTop = compact ? height * 0.36 : height * 0.39;
+  const buttonHeight = compact ? 56 : 62;
 
-  useEffect(() => {
-    // Logo neon pulsing
-    logoGlow.value = withRepeat(
-      withSequence(
-        withTiming(1,   { duration: 900,  easing: Easing.inOut(Easing.sin) }),
-        withTiming(0.5, { duration: 900,  easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1,
-      false,
-    );
-    // Parıltı yanıp sönme
-    sparkleOpacity.value = withRepeat(
-      withSequence(
-        withTiming(1,   { duration: 600 }),
-        withTiming(0.2, { duration: 600 }),
-      ),
-      -1,
-      false,
-    );
-  }, []);
-
-  const logoStyle = useAnimatedStyle(() => ({
-    textShadowRadius: 18 + logoGlow.value * 14,
-    opacity: 0.85 + logoGlow.value * 0.15,
-  }));
-
-  const sparkleStyle = useAnimatedStyle(() => ({
-    opacity: sparkleOpacity.value,
-  }));
-
-  function handleMenu(key: string) {
-    if (key === 'play') onPlay();
-    // Diğer ekranlar Aşama 3'te açılacak
+  function handleLockedMenu(key: LockedMenuKey) {
+    Alert.alert(LOCKED_MENU_MESSAGES[key], strings.yakinda);
   }
 
   return (
     <View style={styles.container}>
-      {/* SVG arka plan — stadyum çizgileri */}
-      <StadiumBackground />
+      <ImageBackground
+        source={homeBackground}
+        resizeMode="cover"
+        style={styles.background}
+      >
+        <View style={styles.scrim} />
+        <View style={styles.vignetteTop} />
+        <View style={styles.vignetteBottom} />
 
-      {/* Logo alanı */}
-      <View style={styles.logoArea}>
-        {/* Üst neon çizgi */}
-        <Animated.View style={[styles.neonLine, sparkleStyle]} />
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.topBar}>
+            <PlayerProgress compact={compact} />
 
-        <Text style={styles.logoSub}>⚽  BAYRAK  ⚽</Text>
+            <View style={styles.topActions}>
+              <CurrencyPill icon={<CoinIcon />} value="1.250" />
+              <CurrencyPill icon={<GemIcon />} value="85" />
+              <TouchableOpacity
+                accessibilityLabel={strings.ayarlar}
+                accessibilityRole="button"
+                activeOpacity={0.82}
+                onPress={() => handleLockedMenu('settings')}
+                style={styles.settingsButton}
+              >
+                <SettingsIcon size={25} />
+              </TouchableOpacity>
+            </View>
+          </View>
 
-        <Animated.Text style={[styles.logoTitle, logoStyle]}>
-          FLAG
-        </Animated.Text>
-        <Animated.Text style={[styles.logoTitle, styles.logoTitleAccent, logoStyle]}>
-          STRIKER
-        </Animated.Text>
-
-        <Animated.View style={[styles.neonLine, styles.neonLineBottom, sparkleStyle]} />
-      </View>
-
-      {/* Menü butonları */}
-      <View style={styles.menuArea}>
-        {MENU_ITEMS.map((item) => (
-          <TouchableOpacity
-            key={item.key}
-            style={[styles.button, item.primary && styles.buttonPrimary]}
-            onPress={() => handleMenu(item.key)}
-            activeOpacity={0.75}
-          >
-            <Text style={[styles.buttonText, item.primary && styles.buttonTextPrimary]}>
-              {item.label()}
+          <View style={[styles.brand, { marginTop: compact ? 22 : 34 }]}>
+            <FlagRibbonIcon size={compact ? 28 : 34} />
+            <Text style={[styles.brandKicker, { fontSize: 15 * titleScale }]}>
+              {strings.brandKicker}
             </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+            <Text style={[styles.brandTitle, { fontSize: 39 * titleScale }]}>
+              {strings.brandTitle}
+            </Text>
+            <View style={styles.brandRule} />
+          </View>
 
-      {/* Alt versiyon notu */}
-      <Text style={styles.version}>v1.0 · Flag Striker</Text>
+          <View
+            style={[
+              styles.menuShell,
+              {
+                top: menuTop,
+                transform: [{ translateX: -shellWidth / 2 }],
+                width: shellWidth,
+              },
+            ]}
+          >
+            <View style={styles.shellHeader}>
+              <GlobeIcon color="#75f7ff" size={22} />
+              <Text style={styles.shellHeaderText}>{strings.worldArena}</Text>
+            </View>
+
+            <PrimaryButton height={buttonHeight + 8} onPress={onPlay} />
+
+            <View style={styles.secondaryGrid}>
+              {menuItems.map((item, index) => (
+                <SecondaryButton
+                  delay={160 + index * 140}
+                  icon={item.icon}
+                  key={item.key}
+                  label={item.label}
+                  onPress={() => handleLockedMenu(item.key)}
+                />
+              ))}
+            </View>
+          </View>
+        </SafeAreaView>
+      </ImageBackground>
     </View>
   );
 }
 
-// SVG stadyum arka planı — saha çizgileri + projektör ışıkları
-function StadiumBackground() {
-  const fieldY = height * 0.72;
-  const fieldW = width * 0.85;
-  const fieldH = height * 0.18;
-  const cx = width / 2;
+type PlayerProgressProps = {
+  compact: boolean;
+};
 
+function PlayerProgress({ compact }: PlayerProgressProps) {
   return (
-    <Svg
-      style={StyleSheet.absoluteFill}
-      width={width}
-      height={height}
-      pointerEvents="none"
-    >
-      {/* Zemin gradient simülasyonu (koyu mavi → yeşil saha tonu) */}
-      <Rect x={0} y={fieldY} width={width} height={height - fieldY}
-        fill="rgba(0,60,20,0.25)" />
-
-      {/* Saha dış çerçevesi */}
-      <Rect
-        x={(width - fieldW) / 2} y={fieldY + 8}
-        width={fieldW} height={fieldH}
-        fill="none"
-        stroke="rgba(0,255,136,0.18)"
-        strokeWidth={1.5}
-        rx={4}
-      />
-
-      {/* Saha orta çizgisi */}
-      <Line
-        x1={(width - fieldW) / 2} y1={fieldY + 8 + fieldH / 2}
-        x2={(width + fieldW) / 2} y2={fieldY + 8 + fieldH / 2}
-        stroke="rgba(0,255,136,0.12)"
-        strokeWidth={1}
-      />
-
-      {/* Orta daire */}
-      <Circle
-        cx={cx} cy={fieldY + 8 + fieldH / 2}
-        r={fieldH * 0.38}
-        fill="none"
-        stroke="rgba(0,255,136,0.12)"
-        strokeWidth={1}
-      />
-
-      {/* Sol projektör */}
-      <Line
-        x1={width * 0.08} y1={0}
-        x2={width * 0.38} y2={height * 0.55}
-        stroke="rgba(0,212,255,0.06)"
-        strokeWidth={30}
-      />
-      {/* Sağ projektör */}
-      <Line
-        x1={width * 0.92} y1={0}
-        x2={width * 0.62} y2={height * 0.55}
-        stroke="rgba(0,212,255,0.06)"
-        strokeWidth={30}
-      />
-
-      {/* Üst dekoratif neon noktalı şerit */}
-      {[0.15, 0.3, 0.5, 0.7, 0.85].map((xRatio, i) => (
-        <Circle
-          key={i}
-          cx={width * xRatio}
-          cy={height * 0.06}
-          r={2}
-          fill={i === 2 ? colors.neonGold : colors.neonBlue}
-          opacity={0.5}
-        />
-      ))}
-    </Svg>
+    <View style={[styles.playerCard, compact && styles.playerCardCompact]}>
+      <View style={styles.avatarFrame}>
+        <BallBadgeIcon size={compact ? 32 : 37} />
+      </View>
+      <View style={styles.playerCopy}>
+        <Text style={styles.rankText}>{strings.rankStriker}</Text>
+        <Text style={styles.levelText}>{strings.levelLabel(25)}</Text>
+        <View style={styles.xpTrack}>
+          <View style={styles.xpFill} />
+        </View>
+      </View>
+    </View>
   );
 }
 
+type CurrencyPillProps = {
+  icon: ReactNode;
+  value: string;
+};
+
+function CurrencyPill({ icon, value }: CurrencyPillProps) {
+  return (
+    <View style={styles.currencyPill}>
+      <View style={styles.currencyIcon}>{icon}</View>
+      <Text style={styles.currencyText}>{value}</Text>
+    </View>
+  );
+}
+
+type PrimaryButtonProps = {
+  height: number;
+  onPress: () => void;
+};
+
+function PrimaryButton({ height, onPress }: PrimaryButtonProps) {
+  const pulse = usePulse(0);
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: 0.18 + pulse.value * 0.34,
+    transform: [{ scale: 1 + pulse.value * 0.018 }],
+  }));
+
+  return (
+    <TouchableOpacity
+      accessibilityLabel={strings.oyna}
+      accessibilityRole="button"
+      activeOpacity={0.82}
+      onPress={onPress}
+      style={[styles.primaryButton, { height }]}
+    >
+      <Animated.View pointerEvents="none" style={[styles.primaryGlow, glowStyle]} />
+      <View style={styles.primaryIconFrame}>
+        <PlayIcon size={32} />
+      </View>
+      <Text style={styles.primaryButtonText}>{strings.oyna}</Text>
+      <View style={styles.primaryChevron}>
+        <ChevronIcon color="#001522" size={22} />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+type SecondaryButtonProps = {
+  delay: number;
+  icon: ReactNode;
+  label: string;
+  onPress: () => void;
+};
+
+function SecondaryButton({ delay, icon, label, onPress }: SecondaryButtonProps) {
+  const pulse = usePulse(delay);
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: 0.08 + pulse.value * 0.18,
+  }));
+
+  return (
+    <TouchableOpacity
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      activeOpacity={0.82}
+      onPress={onPress}
+      style={styles.secondaryButton}
+    >
+      <Animated.View pointerEvents="none" style={[styles.secondaryGlow, glowStyle]} />
+      <View style={styles.secondaryIconFrame}>{icon}</View>
+      <Text numberOfLines={1} style={styles.secondaryText}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function usePulse(delay: number) {
+  const pulse = useSharedValue(0);
+
+  useEffect(() => {
+    pulse.value = withDelay(
+      delay,
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 1050, easing: Easing.inOut(Easing.sin) }),
+          withTiming(0, { duration: 1050, easing: Easing.inOut(Easing.sin) }),
+        ),
+        -1,
+        false,
+      ),
+    );
+  }, [delay, pulse]);
+
+  return pulse;
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
+  avatarFrame: {
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoArea: {
-    alignItems: 'center',
-    marginBottom: 44,
-  },
-  neonLine: {
-    width: 180,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: colors.neonBlue,
-    shadowColor: colors.neonBlue,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 6,
-    marginVertical: 10,
-  },
-  neonLineBottom: {
-    backgroundColor: colors.neonGreen,
-    shadowColor: colors.neonGreen,
-  },
-  logoSub: {
-    color: colors.textMuted,
-    fontSize: 13,
-    letterSpacing: 4,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  logoTitle: {
-    color: colors.neonBlue,
-    fontSize: 52,
-    fontWeight: '900',
-    letterSpacing: 6,
-    textShadowColor: colors.neonBlue,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 18,
-    lineHeight: 56,
-  },
-  logoTitleAccent: {
-    color: colors.neonGreen,
-    textShadowColor: colors.neonGreen,
-    fontSize: 44,
-    letterSpacing: 8,
-  },
-  menuArea: {
-    width: '78%',
-    gap: 12,
-  },
-  button: {
+    backgroundColor: 'rgba(0, 212, 255, 0.08)',
+    borderColor: '#ffd233',
+    borderRadius: 24,
     borderWidth: 1.5,
-    borderColor: 'rgba(0,212,255,0.35)',
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,212,255,0.06)',
+    height: 46,
+    justifyContent: 'center',
+    marginRight: 10,
+    width: 46,
   },
-  buttonPrimary: {
-    borderColor: colors.neonGreen,
-    backgroundColor: 'rgba(0,255,136,0.14)',
-    shadowColor: colors.neonGreen,
+  background: {
+    flex: 1,
+    height: '100%',
+    width: '100%',
+  },
+  brand: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  brandKicker: {
+    color: '#75f7ff',
+    fontWeight: '900',
+    letterSpacing: 0,
+    marginTop: 3,
+    textShadowColor: '#001b2f',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+  brandRule: {
+    backgroundColor: '#00ff88',
+    borderRadius: 2,
+    height: 4,
+    marginTop: 5,
+    shadowColor: '#00ff88',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 10,
+    width: 126,
+  },
+  brandTitle: {
+    color: '#ffffff',
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 43,
+    textShadowColor: '#00d4ff',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 16,
+  },
+  container: {
+    backgroundColor: '#02050d',
+    flex: 1,
+  },
+  currencyIcon: {
+    alignItems: 'center',
+    height: 25,
+    justifyContent: 'center',
+    marginRight: 5,
+    width: 25,
+  },
+  currencyPill: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(2, 12, 29, 0.82)',
+    borderColor: 'rgba(117, 247, 255, 0.28)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    minWidth: 82,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  currencyText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0,
+  },
+  levelText: {
+    color: '#75f7ff',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0,
+    marginTop: 1,
+  },
+  menuShell: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(1, 12, 28, 0.72)',
+    borderColor: 'rgba(0, 212, 255, 0.28)',
+    borderRadius: 24,
+    borderWidth: 1,
+    left: '50%',
+    padding: 13,
+    position: 'absolute',
+    shadowColor: '#00d4ff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.28,
+    shadowRadius: 22,
+  },
+  playerCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(2, 12, 29, 0.82)',
+    borderColor: 'rgba(0, 212, 255, 0.36)',
+    borderRadius: 17,
+    borderWidth: 1,
+    flexDirection: 'row',
+    minHeight: 60,
+    paddingLeft: 7,
+    paddingRight: 12,
+    shadowColor: '#00d4ff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.32,
+    shadowRadius: 10,
+  },
+  playerCardCompact: {
+    minHeight: 54,
+    transform: [{ scale: 0.94 }],
+  },
+  playerCopy: {
+    width: 94,
+  },
+  primaryButton: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    backgroundColor: '#00b963',
+    borderColor: '#7dffb7',
+    borderRadius: 19,
+    borderWidth: 2,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    shadowColor: '#00ff88',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowRadius: 18,
   },
-  buttonText: {
-    color: colors.textDim,
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 1,
+  primaryButtonText: {
+    color: '#ffffff',
+    fontSize: 29,
+    fontWeight: '900',
+    letterSpacing: 0,
+    textShadowColor: 'rgba(0,0,0,0.36)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 3,
   },
-  buttonTextPrimary: {
-    color: colors.neonGreen,
-    fontSize: 18,
-    fontWeight: 'bold',
-    letterSpacing: 2,
-  },
-  version: {
+  primaryChevron: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    height: 30,
+    justifyContent: 'center',
     position: 'absolute',
-    bottom: 24,
-    color: colors.textMuted,
-    fontSize: 11,
-    letterSpacing: 1,
+    right: 18,
+    width: 30,
+  },
+  primaryGlow: {
+    backgroundColor: '#89ffd2',
+    bottom: -10,
+    left: 30,
+    position: 'absolute',
+    right: 30,
+    shadowColor: '#00ff88',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 24,
+    top: -10,
+  },
+  primaryIconFrame: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 23, 37, 0.42)',
+    borderColor: 'rgba(255,255,255,0.78)',
+    borderRadius: 19,
+    borderWidth: 1,
+    height: 42,
+    justifyContent: 'center',
+    left: 16,
+    position: 'absolute',
+    width: 48,
+  },
+  rankText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  scrim: {
+    backgroundColor: 'rgba(0, 5, 16, 0.24)',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  secondaryButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(1, 28, 52, 0.9)',
+    borderColor: 'rgba(0, 212, 255, 0.58)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flex: 1,
+    height: 72,
+    justifyContent: 'center',
+    minWidth: 0,
+    overflow: 'hidden',
+    paddingHorizontal: 5,
+    shadowColor: '#00d4ff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+  },
+  secondaryGlow: {
+    backgroundColor: '#00d4ff',
+    bottom: -18,
+    left: 8,
+    position: 'absolute',
+    right: 8,
+    top: -18,
+  },
+  secondaryGrid: {
+    flexDirection: 'row',
+    gap: 9,
+    marginTop: 11,
+  },
+  secondaryIconFrame: {
+    alignItems: 'center',
+    height: 28,
+    justifyContent: 'center',
+    marginBottom: 5,
+    width: 28,
+  },
+  secondaryText: {
+    color: '#effcff',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0,
+    textAlign: 'center',
+  },
+  settingsButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 212, 255, 0.2)',
+    borderColor: 'rgba(117, 247, 255, 0.36)',
+    borderRadius: 20,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  shellHeader: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    borderColor: 'rgba(117, 247, 255, 0.18)',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 10,
+    paddingVertical: 8,
+  },
+  shellHeaderText: {
+    color: '#bdfbff',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0,
+    marginLeft: 7,
+  },
+  topActions: {
+    alignItems: 'flex-end',
+    gap: 7,
+  },
+  topBar: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
+    paddingTop: 8,
+  },
+  vignetteBottom: {
+    backgroundColor: 'rgba(0, 7, 17, 0.26)',
+    bottom: 0,
+    height: '26%',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+  },
+  vignetteTop: {
+    backgroundColor: 'rgba(0, 5, 16, 0.34)',
+    height: '33%',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  xpFill: {
+    backgroundColor: '#75f7ff',
+    borderRadius: 3,
+    height: '100%',
+    width: '68%',
+  },
+  xpTrack: {
+    backgroundColor: 'rgba(0, 19, 45, 0.92)',
+    borderColor: 'rgba(0, 212, 255, 0.46)',
+    borderRadius: 4,
+    borderWidth: 1,
+    height: 8,
+    marginTop: 5,
+    overflow: 'hidden',
   },
 });

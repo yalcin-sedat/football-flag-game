@@ -68,8 +68,8 @@ export default function FeedbackMessage({ result }: FeedbackMessageProps) {
     >
       <Text style={styles.text}>
         {isCorrect
-          ? `${strings.dogruIsabet}\n${strings.bayrakBilgisi(displayed.countryName ?? '')}`
-          : strings.yanlisBayrak}
+          ? `${strings.pinSaplandi}\n${displayed.countryName ?? ''}`
+          : strings.carpisma}
       </Text>
     </Animated.View>
   );
