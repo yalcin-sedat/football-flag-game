@@ -50,6 +50,13 @@
 [2026-01-15] [Agent 1 - Oyun] — gameLogic.ts'de getHitSegment ve isMatch yazıldı, test edildi çalışıyor. Sıradaki: GameScreen'e bağlama. Not: rotation değeri JS'e useEffect+interval ile okunuyor.
 -->
 
+[2026-06-17] [Agent 1 - Oyun] — getHitSegment() çarpışma açısı hatası düzeltildi.
+- Hata: rotation=0 çarkın TEPESİ (0°) olarak hesaplanıyordu; top aşağıdan gelip ALTA (180°) çarpar.
+- Düzeltme: hitAngle = (180 - normalized + 360) % 360 → Wheel.tsx SVG koordinatlarıyla tam örtüşüyor.
+- Doğrulama (node inline): rot=0→BR, rot=90→DE, rot=180→TR, rot=270→FR ✅
+- Değiştirilen tek dosya: src/utils/gameLogic.ts (getHitSegment fonksiyonu)
+- tsc --noEmit: 0 hata ✅
+
 [2026-06-17] [Agent 1+2 - Oyun+Tasarım] — Aşama 2c level sistemi + yüksek skor tamamlandı.
 - Oluşturulan: src/data/levels.ts (3 level: 4/6/8 dilim, 4000/3200/2600ms, eşik 10/25/∞ puan)
 - Oluşturulan: src/utils/storage.ts (AsyncStorage yüksek skor; saveHighScoreIfBetter → boolean)

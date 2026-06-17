@@ -8,16 +8,15 @@ export type GameState = {
 };
 
 // Çarkın o anki rotation açısından hangi dilime vurulduğunu hesaplar.
-// rotation: derece (0–360), segmentCount: dilim sayısı.
-// Tepe (0°/360°) referans noktasıdır; dilimler saat yönünde indekslenir.
+// rotation: derece (0–360 arası, saat yönü pozitif).
+// Top aşağıdan gelip çarkın ALTINA (180°) çarpar.
+// Çark R derece döndüğünde, altta duran orijinal dilim açısı = (180 - R).
 export function getHitSegment(rotation: number, segmentCount: number): number {
-  // Açıyı 0–360 aralığına normalize et
-  const normalized = ((rotation % 360) + 360) % 360;
-  // Her dilimin kaç derece kapladığı
-  const segmentAngle = 360 / segmentCount;
-  // Hangi dilime denk geldiği — tepe (0°) = dilim 0'ın merkezi
-  const index = Math.floor(normalized / segmentAngle) % segmentCount;
-  return index;
+  const normalized    = ((rotation % 360) + 360) % 360;
+  const segmentAngle  = 360 / segmentCount;
+  // Top çarkın altına (180°) çarpar; orijinal dilim açısını bul
+  const hitAngle = ((180 - normalized) % 360 + 360) % 360;
+  return Math.floor(hitAngle / segmentAngle) % segmentCount;
 }
 
 // Topun bayrağı (ballCode) çarktaki vurulan dilimin ülkesiyle eşleşiyor mu?
